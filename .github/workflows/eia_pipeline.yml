@@ -39,7 +39,7 @@ jobs:
         git add data/csv
 
         if git diff --cached --quiet; then
-          echo "No changes to commit"
+          echo "No changes detected. Skipping commit & push."
           exit 0
         fi
 
