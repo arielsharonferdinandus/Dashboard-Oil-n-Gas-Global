@@ -1,8 +1,11 @@
 name: EIA Data Pipeline
 
+permissions:
+  contents: write
+
 on:
   schedule:
-    - cron: "0 18 * * *"   # setiap hari jam 02:00 UTC
+    - cron: "0 18 * * *"
   workflow_dispatch:
 
 jobs:
@@ -31,5 +34,5 @@ jobs:
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
         git add data/csv
-        git commit -m "Auto-update EIA energy price data" || echo "No changes"
+        git diff --cached --quiet || git commit -m "Auto-update EIA energy price data"
         git push
