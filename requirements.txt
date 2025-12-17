@@ -3,3 +3,5 @@ numpy
 requests
 openpyxl
 xlrd
+streamlit
+plotly
