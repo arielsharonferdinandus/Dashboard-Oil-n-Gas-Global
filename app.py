@@ -3,34 +3,25 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from pathlib import Path
-
-DATA_DIR = Path("data/csv")
 
 @st.cache_data
 def load_crude_oil_summary():
-    wti = pd.read_csv(DATA_DIR / "crude_oil_ching_ok_wti.csv", parse_dates=["date"])
-    brent = pd.read_csv(DATA_DIR / "crude_oil_europe_brent.csv", parse_dates=["date"])
+    wti = pd.read_csv(
+        "data/csv/crude_oil_ching_ok_wti.csv",
+        parse_dates=["date"]
+    )
+    brent = pd.read_csv(
+        "data/csv/crude_oil_europe_brent.csv",
+        parse_dates=["date"]
+    )
 
     wti = wti.rename(columns={"price": "WTI"})
     brent = brent.rename(columns={"price": "Brent"})
 
     df = pd.merge(brent, wti, on="date", how="inner")
-    return df.sort_values("date").tail(90)
+    df = df.sort_values("date").tail(90)
 
-@st.cache_data(ttl=3600)
-def get_cnn_oil_news():
-    try:
-        from cnn_scraper import scrape_cnn_news
-        return scrape_cnn_news("oil gas energy")
-    except Exception as e:
-        return [{
-            "title": "News temporarily unavailable",
-            "summary": "Unable to fetch CNN news at the moment.",
-            "source": "CNN",
-            "published": "",
-            "link": ""
-        }]
+    return df
 
 st.set_page_config(page_title="Global Energy Dashboard", layout="wide")
 
@@ -154,15 +145,17 @@ with col5:
 # -----------------------------
 # News Section
 # -----------------------------
-st.subheader("🛢️ Global Oil & Gas News (CNN)")
-
-news = get_cnn_oil_news()
+st.subheader("Global Migas News & Analysis")
 
 for article in news:
-    st.markdown(f"**{article['title']}**")
-    st.caption(f"{article['source']} — {article['published']}")
-    st.write(article["summary"])
-    st.markdown(f"[Read more →]({article['link']})")
-    st.markdown("---")
+    col_img, col_text = st.columns([1, 4])
+
+    with col_img:
+        st.image(article["image"], width=200)
+
+    with col_text:
+        st.markdown(f"**{article['title']}**")
+        st.caption(article["source"])
+        st.write(article["summary"])
 
 st.caption("Streamlit Prototype")
