@@ -5,5 +5,3 @@ openpyxl
 xlrd
 streamlit
 plotly
-beautifulsoup4
-lxml
