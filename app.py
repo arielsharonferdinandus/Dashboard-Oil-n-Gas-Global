@@ -163,11 +163,21 @@ news = [
     }
 ]
 
+# -----------------------------
+# News Section
+# -----------------------------
+st.subheader("Global Migas News & Analysis")
+
 for article in news:
-    st.markdown(f"**{article['title']}**")
-    st.caption(article["source"])
-    st.write(article["summary"])
-    st.markdown("---")
+    col_img, col_text = st.columns([1, 4])
+
+    with col_img:
+        st.image(article["image"], width=200)
+
+    with col_text:
+        st.markdown(f"**{article['title']}**")
+        st.caption(article["source"])
+        st.write(article["summary"])
 
 # =============================
 # FOOTER
