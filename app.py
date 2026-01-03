@@ -1,126 +1,162 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from pathlib import Path
 
 # =============================
 # CONFIG
 # =============================
 st.set_page_config(
-    page_title="Global Energy Dashboard",
+    page_title="Global Energy Price – Detail View",
     layout="wide"
 )
 
-st.title("🌍 Global Energy Dashboard")
-st.caption("Oil, Gas & Energy Visualization – Prototype")
+st.title("📈 Global Energy Price – Detail View")
+st.caption("Based on International Energy Price Time Series")
+
+DATA_DIR = Path("data/csv")
 
 # =============================
 # LOAD DATA
 # =============================
 @st.cache_data
-def load_price_data():
-    df = pd.read_csv("data/csv/price_timeseries.csv")
+def load_price_timeseries():
+    df = pd.read_csv(DATA_DIR / "price_timeseries.csv")
     df["period"] = pd.to_datetime(df["period"])
-    df = df[df["benchmark"] == "Brent"]
-    df = df.sort_values("period").tail(90)
+    df = df.sort_values("period")
     return df
 
 
-@st.cache_data
-def load_production_oil():
-    df = pd.read_csv("data/csv/country_production_oil.csv")
-    df = (
-        df.groupby("Year", as_index=False)["Production"]
-        .sum()
-        .sort_values("Year")
-    )
-    return df
-
-
-@st.cache_data
-def load_consumption_oil():
-    df = pd.read_csv("data/csv/country_consumtion_oil.csv")
-    df = (
-        df.groupby("Year", as_index=False)["Consumtion"]
-        .sum()
-        .sort_values("Year")
-    )
-    return df
-
+price_df = load_price_timeseries()
 
 # =============================
-# DUMMY MAP DATA
+# SELECTORS
 # =============================
-migas_map = pd.DataFrame({
-    "Country": ["United States", "Saudi Arabia", "Russia", "China", "India", "Indonesia"],
-    "iso3": ["USA", "SAU", "RUS", "CHN", "IND", "IDN"],
-    "Production": [18.5, 12.1, 10.8, 4.2, 0.8, 0.7]
-})
+st.subheader("Energy Price Explorer")
 
-# =============================
-# LOAD ALL
-# =============================
-price_df = load_price_data()
-prod_oil_df = load_production_oil()
-cons_oil_df = load_consumption_oil()
-
-# =============================
-# LAYOUT ROW 1 (3 COLUMNS)
-# =============================
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("🛢️ Brent Oil Price (Spot)")
-    fig = px.line(
-        price_df,
-        x="period",
-        y="value",
-        labels={"value": "USD / Barrel", "period": "Date"},
-        height=260
+    selected_benchmark = st.selectbox(
+        "Select Benchmark",
+        sorted(price_df["benchmark"].dropna().unique())
     )
-    st.plotly_chart(fig, use_container_width=True)
-
 
 with col2:
-    st.subheader("🏭 Global Oil Production")
-    fig = px.line(
-        prod_oil_df,
-        x="Year",
-        y="Production",
-        labels={"Production": "Total Production"},
-        height=260
+    filtered_products = (
+        price_df[price_df["benchmark"] == selected_benchmark]
+        ["product-name"]
+        .dropna()
+        .unique()
     )
-    st.plotly_chart(fig, use_container_width=True)
 
-
-with col3:
-    st.subheader("⛽ Global Oil Consumption")
-    fig = px.line(
-        cons_oil_df,
-        x="Year",
-        y="Consumtion",
-        labels={"Consumtion": "Total Consumption"},
-        height=260
+    selected_product = st.selectbox(
+        "Select Product",
+        sorted(filtered_products)
     )
-    st.plotly_chart(fig, use_container_width=True)
 
 # =============================
-# LAYOUT ROW 2 (MAP FULL WIDTH)
+# FILTER DATA
 # =============================
-st.subheader("🗺️ Global Energy Production Map (Dummy Data)")
+filtered_df = price_df[
+    (price_df["benchmark"] == selected_benchmark) &
+    (price_df["product-name"] == selected_product)
+]
 
-fig = px.choropleth(
-    migas_map,
-    locations="iso3",
-    color="Production",
-    hover_name="Country",
-    projection="natural earth",
-    color_continuous_scale="YlOrRd",
+# =============================
+# PRICE CHART
+# =============================
+st.subheader("Price Time Series")
+
+fig = px.line(
+    filtered_df,
+    x="period",
+    y="value",
+    labels={
+        "period": "Date",
+        "value": f"Price ({filtered_df['units'].iloc[0]})"
+    },
     height=420
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
 # =============================
-# FOOTER
+# ACTION BUTTONS
 # =============================
-st.caption("Streamlit Energy Dashboard – Dataset-based Prototype")
+col_btn1, col_btn2 = st.columns([1, 1])
+
+with col_btn1:
+    if st.button("⬅ Back to Dashboard"):
+        st.switch_page("app.py")
+
+with col_btn2:
+    if st.button("📊 View Production vs Consumption"):
+        st.switch_page("pages/Consumption_Production.py")
+
+# =============================
+# LATEST SNAPSHOT
+# =============================
+st.subheader("Latest Price Snapshot")
+
+latest = filtered_df.iloc[-1]
+
+snapshot = pd.DataFrame({
+    "Metric": [
+        "Date",
+        "Price",
+        "Units",
+        "Benchmark",
+        "Product"
+    ],
+    "Value": [
+        latest["period"].date(),
+        round(latest["value"], 2),
+        latest["units"],
+        latest["benchmark"],
+        latest["product-name"]
+    ]
+})
+
+st.dataframe(snapshot, use_container_width=True, hide_index=True)
+
+# =============================
+# NEWS SECTION
+# =============================
+st.subheader("📰 Global Migas News & Analysis")
+
+news = [
+    {
+        "title": "OPEC+ Considers Production Cut",
+        "source": "Reuters",
+        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
+        "image": "images/download.jpeg"
+    },
+    {
+        "title": "Middle East Tensions Push Oil Prices Higher",
+        "source": "Bloomberg",
+        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
+        "image": "images/download (1).jpeg"
+    },
+    {
+        "title": "Global Energy Transition Impacts Oil Demand",
+        "source": "IEA",
+        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
+        "image": "images/download (2).jpeg"
+    }
+]
+
+for article in news:
+    col_img, col_text = st.columns([1, 4])
+
+    with col_img:
+        st.image(article["image"], width=150)
+
+    with col_text:
+        st.markdown(f"**{article['title']}**")
+        st.caption(article["source"])
+        st.write(article["summary"])
+
+    st.markdown("---")
+
+st.caption("Energy Price Dashboard – Detail View (Dataset-based)")
