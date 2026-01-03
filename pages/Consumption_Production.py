@@ -145,3 +145,4 @@ if st.button("⬅ Back to Dashboard"):
     st.switch_page("app.py")
 
 st.caption("Energy Consumption & Production – Detail View")
+py
