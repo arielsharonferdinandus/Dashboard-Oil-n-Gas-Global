@@ -28,19 +28,37 @@ def load_price_data():
 
 
 @st.cache_data
-def load_prod_cons_oil():
-    prod = pd.read_csv("data/csv/country_production_oil.csv")
-    cons = pd.read_csv("data/csv/country_consumtion_oil.csv")
+def load_prod_cons():
+    # --- OIL ---
+    prod_oil = pd.read_csv("data/csv/country_production_oil.csv")
+    cons_oil = pd.read_csv("data/csv/country_consumtion_oil.csv")
 
-    prod = prod.groupby("Year", as_index=False)["Production"].sum()
-    cons = cons.groupby("Year", as_index=False)["Consumtion"].sum()
+    prod_oil = prod_oil.groupby("Year", as_index=False)["Production"].sum()
+    cons_oil = cons_oil.groupby("Year", as_index=False)["Consumtion"].sum()
 
-    df = pd.merge(prod, cons, on="Year", how="inner")
+    oil = pd.merge(prod_oil, cons_oil, on="Year", how="outer")
+    oil["Energy"] = "Oil"
+
+    # --- GAS ---
+    prod_gas = pd.read_csv("data/csv/country_production_gas.csv")
+    cons_gas = pd.read_csv("data/csv/country_consumtion_gas.csv")
+
+    prod_gas = prod_gas.groupby("Year", as_index=False)["Production"].sum()
+    cons_gas = cons_gas.groupby("Year", as_index=False)["Consumtion"].sum()
+
+    gas = pd.merge(prod_gas, cons_gas, on="Year", how="outer")
+    gas["Energy"] = "Gas"
+
+    # --- COMBINE ---
+    df = pd.concat([oil, gas], ignore_index=True)
+    df = df.fillna(0).sort_values("Year")
+
     return df
 
 
+
 price_df = load_price_data()
-prod_cons_df = load_prod_cons_oil()
+prod_cons_df = load_prod_cons()
 
 # =============================
 # DUMMY MAP DATA
@@ -66,7 +84,7 @@ subsidy_gdp = pd.DataFrame({
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.subheader("🛢️ Global Oil Price Comparison")
+    st.subheader("Global Oil Price Comparison")
 
     fig = px.line(
         price_df,
@@ -87,7 +105,6 @@ with col1:
         legend_title_text="Click to focus / hide",
         hovermode="x unified"
     )
-
     st.plotly_chart(fig, use_container_width=True)
 
     if st.button("View more..."):
@@ -95,18 +112,38 @@ with col1:
 
 
 with col2:
-    st.subheader("Global Oil Production vs Consumption")
+    st.subheader("Global Production vs Consumption")
+
+    energy_type = st.selectbox(
+        "Select Energy Type",
+        ["Oil", "Gas"],
+        key="energy_selector"
+    )
+
+    filtered_df = prod_cons_df[prod_cons_df["Energy"] == energy_type]
+
     fig = px.line(
-        prod_cons_df,
+        filtered_df,
         x="Year",
         y=["Production", "Consumtion"],
-        labels={"value": "Volume", "variable": "Metric"},
+        labels={
+            "value": "Volume",
+            "variable": "Metric"
+        },
         height=260
     )
+
+    fig.update_traces(opacity=0.45)
+    fig.update_layout(
+        legend_title_text="Click to focus / hide",
+        hovermode="x unified"
+    )
+
     st.plotly_chart(fig, use_container_width=True)
 
-    if st.button("View more..."):
+    if st.button("View more.."):
         st.switch_page("pages/Consumption_Production.py")
+
 
 with col3:
     st.subheader("Fuel Subsidy vs GDP (Dummy)")
