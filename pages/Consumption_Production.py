@@ -7,12 +7,12 @@ from pathlib import Path
 # CONFIG
 # =============================
 st.set_page_config(
-    page_title="Energy Consumption & Production",
+    page_title="Energy Consumption & Production – Detail View",
     layout="wide"
 )
 
-st.title("⚡ Energy Consumption & Production")
-st.caption("Country-Level Oil & Gas Data – Aggregated Analysis")
+st.title("⚡ Energy Consumption & Production – Detail View")
+st.caption("Country-Level Oil & Gas Data (Dataset-based)")
 
 DATA_DIR = Path("data/csv")
 
@@ -20,49 +20,51 @@ DATA_DIR = Path("data/csv")
 # LOAD DATA
 # =============================
 @st.cache_data
-def load_consumption():
-    oil = pd.read_csv(DATA_DIR / "country_consumtion_oil.csv")
-    gas = pd.read_csv(DATA_DIR / "country_consumtion_gas.csv")
-    oil["Type"] = "Oil"
-    gas["Type"] = "Gas"
-    df = pd.concat([oil, gas], ignore_index=True)
-    return df
+def load_energy_data():
+    # Consumption
+    cons_oil = pd.read_csv(DATA_DIR / "country_consumtion_oil.csv")
+    cons_gas = pd.read_csv(DATA_DIR / "country_consumtion_gas.csv")
+
+    cons_oil["Type"] = "Oil"
+    cons_gas["Type"] = "Gas"
+
+    cons = pd.concat([cons_oil, cons_gas], ignore_index=True)
+
+    # Production
+    prod_oil = pd.read_csv(DATA_DIR / "country_production_oil.csv")
+    prod_gas = pd.read_csv(DATA_DIR / "country_production_gas.csv")
+
+    prod_oil["Type"] = "Oil"
+    prod_gas["Type"] = "Gas"
+
+    prod = pd.concat([prod_oil, prod_gas], ignore_index=True)
+
+    return cons, prod
 
 
-@st.cache_data
-def load_production():
-    oil = pd.read_csv(DATA_DIR / "country_production_oil.csv")
-    gas = pd.read_csv(DATA_DIR / "country_production_gas.csv")
-    oil["Type"] = "Oil"
-    gas["Type"] = "Gas"
-    df = pd.concat([oil, gas], ignore_index=True)
-    return df
-
-
-cons_df = load_consumption()
-prod_df = load_production()
+cons_df, prod_df = load_energy_data()
 
 # =============================
 # SELECTORS
 # =============================
-st.subheader("Data Filters")
+st.subheader("Energy Data Explorer")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
     selected_type = st.selectbox(
         "Energy Type",
-        ["Oil", "Gas"]
+        sorted(cons_df["Type"].unique())
     )
 
 with col2:
     selected_country = st.selectbox(
         "Country",
-        sorted(cons_df["Country"].unique())
+        sorted(cons_df["Country"].dropna().unique())
     )
 
 with col3:
-    selected_metric = st.selectbox(
+    view_mode = st.selectbox(
         "View Mode",
         ["Yearly Trend", "Latest Snapshot"]
     )
@@ -80,19 +82,21 @@ prod_filtered = prod_df[
     (prod_df["Country"] == selected_country)
 ]
 
+merged_df = pd.merge(
+    cons_filtered[["Year", "Consumtion"]],
+    prod_filtered[["Year", "Production"]],
+    on="Year",
+    how="outer"
+).sort_values("Year")
+
 # =============================
-# VISUALIZATION
+# YEARLY TREND
 # =============================
-if selected_metric == "Yearly Trend":
+if view_mode == "Yearly Trend":
     st.subheader(f"{selected_country} – {selected_type} Consumption vs Production")
 
     fig = px.line(
-        pd.merge(
-            cons_filtered[["Year", "Consumtion"]],
-            prod_filtered[["Year", "Production"]],
-            on="Year",
-            how="outer"
-        ),
+        merged_df,
         x="Year",
         y=["Consumtion", "Production"],
         labels={
@@ -102,55 +106,76 @@ if selected_metric == "Yearly Trend":
         height=420
     )
 
+    fig.update_traces(opacity=0.45)
+    fig.update_layout(hovermode="x unified")
+
     st.plotly_chart(fig, use_container_width=True)
 
+# =============================
+# LATEST SNAPSHOT
+# =============================
 else:
     st.subheader(f"{selected_country} – Latest {selected_type} Snapshot")
 
-    latest_cons = cons_filtered.sort_values("Year").iloc[-1]
-    latest_prod = prod_filtered.sort_values("Year").iloc[-1]
+    latest_row = merged_df.dropna().iloc[-1]
 
     snapshot = pd.DataFrame({
         "Metric": [
-            "Latest Year",
+            "Year",
             "Consumption",
             "Production",
-            "Unit",
-            "Source"
+            "Energy Type",
+            "Country"
         ],
         "Value": [
-            latest_cons["Year"],
-            round(latest_cons["Consumtion"], 2),
-            round(latest_prod["Production"], 2),
-            latest_cons["Unit"],
-            latest_cons["Source"]
+            int(latest_row["Year"]),
+            round(latest_row["Consumtion"], 2),
+            round(latest_row["Production"], 2),
+            selected_type,
+            selected_country
         ]
-    )
+    })
 
     st.dataframe(snapshot, use_container_width=True, hide_index=True)
 
 # =============================
-# GLOBAL MAP (DUMMY)
+# NEWS SECTION
 # =============================
-st.subheader("🗺️ Global Energy Production Map (Dummy)")
+st.subheader("Global Migas News & Analysis")
 
-dummy_map = pd.DataFrame({
-    "Country": ["United States", "Saudi Arabia", "Russia", "China", "India", "Indonesia"],
-    "iso3": ["USA", "SAU", "RUS", "CHN", "IND", "IDN"],
-    "Production": [18.5, 12.1, 10.8, 4.2, 0.8, 0.7]
-})
+news = [
+    {
+        "title": "OPEC+ Considers Production Cut",
+        "source": "Reuters",
+        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
+        "image": "images/download.jpeg"
+    },
+    {
+        "title": "Middle East Tensions Push Oil Prices Higher",
+        "source": "Bloomberg",
+        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
+        "image": "images/download (1).jpeg"
+    },
+    {
+        "title": "Global Energy Transition Impacts Oil Demand",
+        "source": "IEA",
+        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
+        "image": "images/download (2).jpeg"
+    }
+]
 
-fig = px.choropleth(
-    dummy_map,
-    locations="iso3",
-    color="Production",
-    hover_name="Country",
-    projection="natural earth",
-    color_continuous_scale="Blues",
-    height=420
-)
+for article in news:
+    col_img, col_text = st.columns([1, 4])
 
-st.plotly_chart(fig, use_container_width=True)
+    with col_img:
+        st.image(article["image"], width=150)
+
+    with col_text:
+        st.markdown(f"**{article['title']}**")
+        st.caption(article["source"])
+        st.write(article["summary"])
+
+    st.markdown("---")
 
 # =============================
 # BACK BUTTON
@@ -158,4 +183,4 @@ st.plotly_chart(fig, use_container_width=True)
 if st.button("⬅ Back to Dashboard"):
     st.switch_page("app.py")
 
-st.caption("Energy Consumption & Production – Dataset-based Analysis")
+st.caption("Energy Consumption & Production – Detail View")

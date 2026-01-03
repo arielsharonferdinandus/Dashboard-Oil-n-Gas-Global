@@ -160,7 +160,7 @@ with col3:
 # =============================
 # ROW 2 – MAP
 # =============================
-st.subheader("🗺️ Global Energy Production Map (Dummy Data)")
+st.subheader("Global Energy Production Map (Dummy Data)")
 
 fig = px.choropleth(
     migas_map,
@@ -177,7 +177,7 @@ st.plotly_chart(fig, use_container_width=True)
 # =============================
 # NEWS SECTION
 # =============================
-st.subheader("📰 Global Migas News & Analysis")
+st.subheader("Global Migas News & Analysis")
 
 news = [
     {
@@ -200,21 +200,18 @@ news = [
     }
 ]
 
-# -----------------------------
-# News Section
-# -----------------------------
-st.subheader("Global Migas News & Analysis")
-
 for article in news:
     col_img, col_text = st.columns([1, 4])
 
     with col_img:
-        st.image(article["image"], width=200)
+        st.image(article["image"], width=150)
 
     with col_text:
         st.markdown(f"**{article['title']}**")
         st.caption(article["source"])
         st.write(article["summary"])
+
+    st.markdown("---")
 
 # =============================
 # FOOTER

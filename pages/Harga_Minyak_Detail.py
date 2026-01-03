@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📈 Global Energy Price – Detail View")
+st.title("Global Energy Price – Detail View")
 st.caption("Based on International Energy Price Time Series")
 
 DATA_DIR = Path("data/csv")
@@ -110,7 +110,7 @@ st.dataframe(snapshot, use_container_width=True, hide_index=True)
 # =============================
 # NEWS SECTION
 # =============================
-st.subheader("📰 Global Migas News & Analysis")
+st.subheader("Global Migas News & Analysis")
 
 news = [
     {
