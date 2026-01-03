@@ -26,6 +26,19 @@ FUEL_FILES = {
 def load_price_file(filename):
     df = pd.read_csv(DATA_DIR / filename, parse_dates=["date"])
     df = df.sort_values("date")
+
+    df["price"] = (
+        df["price"]
+        .astype(str)
+        .str.replace(",", "", regex=False)
+        .str.replace("$", "", regex=False)
+    )
+
+    df["price"] = pd.to_numeric(df["price"], errors="coerce")
+
+    # IMPORTANT: remove rows with invalid prices
+    df = df.dropna(subset=["price"])
+
     return df
 
 # =============================
