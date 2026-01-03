@@ -90,6 +90,9 @@ with col1:
 
     st.plotly_chart(fig, use_container_width=True)
 
+    if st.button("View more..."):
+        st.switch_page("pages/Harga_Minyak_Detail.py")
+
 
 with col2:
     st.subheader("Global Oil Production vs Consumption")
@@ -101,6 +104,9 @@ with col2:
         height=260
     )
     st.plotly_chart(fig, use_container_width=True)
+
+    if st.button("View more..."):
+        st.switch_page("pages/Consumption_Production.py")
 
 with col3:
     st.subheader("Fuel Subsidy vs GDP (Dummy)")
@@ -130,15 +136,6 @@ fig = px.choropleth(
 )
 
 st.plotly_chart(fig, use_container_width=True)
-
-# =============================
-# ACTION BUTTON
-# =============================
-col_btn1, col_btn2 = st.columns([3, 1])
-
-with col_btn2:
-    if st.button("📊 View Production & Consumption Detail"):
-        st.switch_page("pages/Consumption_Production.py")
 
 # =============================
 # NEWS SECTION
