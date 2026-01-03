@@ -1,71 +1,129 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
+from pathlib import Path
 
+# =============================
+# CONFIG
+# =============================
+st.set_page_config(
+    page_title="Global Energy Price – Detail View",
+    layout="wide"
+)
+
+st.title("📈 Global Energy Price – Detail View")
+st.caption("Based on International Energy Price Time Series")
+
+DATA_DIR = Path("data/csv")
+
+# =============================
+# LOAD DATA
+# =============================
 @st.cache_data
-def load_crude_oil_summary():
-    wti = pd.read_csv(
-        "data/csv/crude_oil_ching_ok_wti.csv",
-        parse_dates=["date"]
-    )
-    brent = pd.read_csv(
-        "data/csv/crude_oil_europe_brent.csv",
-        parse_dates=["date"]
-    )
-
-    wti = wti.rename(columns={"price": "WTI"})
-    brent = brent.rename(columns={"price": "Brent"})
-
-    df = pd.merge(brent, wti, on="date", how="inner")
-    df = df.sort_values("date").tail(90)
-
+def load_price_timeseries():
+    df = pd.read_csv(DATA_DIR / "price_timeseries.csv")
+    df["period"] = pd.to_datetime(df["period"])
+    df = df.sort_values("period")
     return df
 
-st.set_page_config(page_title="Global Energy Dashboard", layout="wide")
 
-st.title("Global Energy Dashboard")
-st.caption("Oil, Gas & Energy Visualization – Prototype")
+price_df = load_price_timeseries()
 
-years = list(range(2015, 2031))
-subsidy_df = pd.DataFrame({
-    "Year": years,
-    "Explicit": np.random.uniform(4, 6, len(years)),
-    "Implicit": np.random.uniform(3, 5, len(years))
+# =============================
+# SELECTORS
+# =============================
+st.subheader("Energy Price Explorer")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    selected_benchmark = st.selectbox(
+        "Select Benchmark",
+        sorted(price_df["benchmark"].dropna().unique())
+    )
+
+with col2:
+    filtered_products = (
+        price_df[price_df["benchmark"] == selected_benchmark]
+        ["product-name"]
+        .dropna()
+        .unique()
+    )
+
+    selected_product = st.selectbox(
+        "Select Product",
+        sorted(filtered_products)
+    )
+
+# =============================
+# FILTER DATA
+# =============================
+filtered_df = price_df[
+    (price_df["benchmark"] == selected_benchmark) &
+    (price_df["product-name"] == selected_product)
+]
+
+# =============================
+# PRICE CHART
+# =============================
+st.subheader("Price Time Series")
+
+fig = px.line(
+    filtered_df,
+    x="period",
+    y="value",
+    labels={
+        "period": "Date",
+        "value": f"Price ({filtered_df['units'].iloc[0]})"
+    },
+    height=420
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# =============================
+# ACTION BUTTONS
+# =============================
+col_btn1, col_btn2 = st.columns([1, 1])
+
+with col_btn1:
+    if st.button("⬅ Back to Dashboard"):
+        st.switch_page("app.py")
+
+with col_btn2:
+    if st.button("📊 View Production vs Consumption"):
+        st.switch_page("pages/Consumption_Production.py")
+
+# =============================
+# LATEST SNAPSHOT
+# =============================
+st.subheader("Latest Price Snapshot")
+
+latest = filtered_df.iloc[-1]
+
+snapshot = pd.DataFrame({
+    "Metric": [
+        "Date",
+        "Price",
+        "Units",
+        "Benchmark",
+        "Product"
+    ],
+    "Value": [
+        latest["period"].date(),
+        round(latest["value"], 2),
+        latest["units"],
+        latest["benchmark"],
+        latest["product-name"]
+    ]
 })
-subsidy_df["Total"] = subsidy_df["Explicit"] + subsidy_df["Implicit"]
 
-years_pc = list(range(1965, 2022))
-prod_cons_df = pd.DataFrame({
-    "Year": years_pc,
-    "Production": np.linspace(30, 85, len(years_pc)) + np.random.randn(len(years_pc)) * 3,
-    "Consumption": np.linspace(5, 75, len(years_pc)) + np.random.randn(len(years_pc)) * 3
-})
+st.dataframe(snapshot, use_container_width=True, hide_index=True)
 
-transparency_df = pd.DataFrame({
-    "Year": list(range(2000, 2022)),
-    "Index": np.random.normal(0.5, 0.6, 22)
-})
-
-migas_map = pd.DataFrame({
-    "Country": ["United States", "Saudi Arabia", "Russia", "China", "India", "Indonesia"],
-    "ISO": ["USA", "SAU", "RUS", "CHN", "IND", "IDN"],
-    "Production": [18.5, 12.1, 10.8, 4.2, 0.8, 0.7]
-})
-
-dates = pd.date_range("2024-01-01", periods=180)
-oil_price = pd.DataFrame({
-    "Date": dates,
-    "Price": np.random.uniform(60, 90, len(dates))
-})
-
-price_table = pd.DataFrame({
-    "Commodity": ["Brent", "WTI", "Gas Alam", "Bensin", "Solar"],
-    "Price": np.random.uniform(1, 100, 5),
-    "Daily %": np.random.uniform(-2, 2, 5),
-    "Monthly %": np.random.uniform(-10, 10, 5)
-})
+# =============================
+# NEWS SECTION
+# =============================
+st.subheader("📰 Global Migas News & Analysis")
 
 news = [
     {
@@ -87,75 +145,18 @@ news = [
         "image": "images/download (2).jpeg"
     }
 ]
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.subheader("Harga Minyak Global")
-
-    oil_price = load_crude_oil_summary()
-
-    fig = px.line(
-        oil_price,
-        x="date",
-        y=["Brent", "WTI"],
-        height=200
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    if st.button("View more..."):
-        st.switch_page("pages/Harga_Minyak_Detail.py")
-
-with col2:
-    st.subheader("Produksi & Konsumsi Minyak Global")
-    fig = px.line(prod_cons_df, x="Year", y=["Production", "Consumption"], height=300)
-    st.plotly_chart(fig, use_container_width=True)
-
-with col3:
-    st.subheader("Pendapatan & Transparansi Industri Ekstraktif")
-    fig = px.scatter(transparency_df, x="Year", y="Index", height=300)
-    fig.add_hline(y=0, line_dash="dash")
-    st.plotly_chart(fig, use_container_width=True)
-
-col4, col5 = st.columns([2, 1])
-
-with col4:
-    st.subheader("Peta Persebaran Energi Global")
-    fig = px.choropleth(
-        migas_map,
-        locations="ISO",
-        color="Production",
-        hover_name="Country",
-        projection="natural earth",
-        height=400
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-with col5:
-    st.subheader("Subsidi Energi")
-    fig = go.Figure()
-    fig.add_bar(x=subsidy_df["Year"], y=subsidy_df["Explicit"], name="Explicit")
-    fig.add_bar(x=subsidy_df["Year"], y=subsidy_df["Implicit"], name="Implicit")
-    fig.add_trace(go.Scatter(
-        x=subsidy_df["Year"], y=subsidy_df["Total"],
-        mode="lines+markers", name="Total"
-    ))
-    fig.update_layout(barmode="stack", height=300)
-    st.plotly_chart(fig, use_container_width=True)
-
-# -----------------------------
-# News Section
-# -----------------------------
-st.subheader("Global Migas News & Analysis")
 
 for article in news:
     col_img, col_text = st.columns([1, 4])
 
     with col_img:
-        st.image(article["image"], width=200)
+        st.image(article["image"], width=150)
 
     with col_text:
         st.markdown(f"**{article['title']}**")
         st.caption(article["source"])
         st.write(article["summary"])
 
-st.caption("Streamlit Prototype")
+    st.markdown("---")
+
+st.caption("Energy Price Dashboard – Detail View (Dataset-based)")

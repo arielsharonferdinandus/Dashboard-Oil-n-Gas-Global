@@ -3,91 +3,114 @@ import pandas as pd
 import plotly.express as px
 from pathlib import Path
 
-st.set_page_config(layout="wide")
-
-st.title("Global Energy Price – Detail View")
-
 # =============================
-# Data Config
+# CONFIG
 # =============================
+st.set_page_config(
+    page_title="Global Energy Price – Detail View",
+    layout="wide"
+)
+
+st.title("📈 Global Energy Price – Detail View")
+st.caption("Based on International Energy Price Time Series")
+
 DATA_DIR = Path("data/csv")
 
-FUEL_FILES = {
-    "Crude Oil - WTI (Cushing, OK)": "crude_oil_ching_ok_wti.csv",
-    "Crude Oil - Brent (Europe)": "crude_oil_europe_brent.csv",
-    "Gasoline - NY Harbor": "gasoline_new_york_harbor.csv",
-    "Gasoline - US Gulf Coast": "gasoline_us_gulf_coast.csv",
-    "Jet Fuel - US Gulf Coast": "jet_fuel_us_gulf_coast.csv",
-    "Propane - Mont Belvieu": "propane_mont_belvieu.csv",
-    "RBOB Gasoline - Los Angeles": "rbob_gasoline_los_angeles_reformulated.csv",
-}
-
+# =============================
+# LOAD DATA
+# =============================
 @st.cache_data
-def load_price_file(filename):
-    df = pd.read_csv(DATA_DIR / filename, parse_dates=["date"])
-    df = df.sort_values("date")
-
-    df["price"] = (
-        df["price"]
-        .astype(str)
-        .str.replace(",", "", regex=False)
-        .str.replace("$", "", regex=False)
-    )
-
-    df["price"] = pd.to_numeric(df["price"], errors="coerce")
-
-    # IMPORTANT: remove rows with invalid prices
-    df = df.dropna(subset=["price"])
-
+def load_price_timeseries():
+    df = pd.read_csv(DATA_DIR / "price_timeseries.csv")
+    df["period"] = pd.to_datetime(df["period"])
+    df = df.sort_values("period")
     return df
 
+
+price_df = load_price_timeseries()
+
 # =============================
-# Selector
+# SELECTORS
 # =============================
 st.subheader("Energy Price Explorer")
 
-selected_label = st.selectbox(
-    "Select Fuel & Market",
-    list(FUEL_FILES.keys())
-)
+col1, col2 = st.columns(2)
 
-df = load_price_file(FUEL_FILES[selected_label])
+with col1:
+    selected_benchmark = st.selectbox(
+        "Select Benchmark",
+        sorted(price_df["benchmark"].dropna().unique())
+    )
+
+with col2:
+    filtered_products = (
+        price_df[price_df["benchmark"] == selected_benchmark]
+        ["product-name"]
+        .dropna()
+        .unique()
+    )
+
+    selected_product = st.selectbox(
+        "Select Product",
+        sorted(filtered_products)
+    )
 
 # =============================
-# Price Chart
+# FILTER DATA
 # =============================
+filtered_df = price_df[
+    (price_df["benchmark"] == selected_benchmark) &
+    (price_df["product-name"] == selected_product)
+]
+
+# =============================
+# PRICE CHART
+# =============================
+st.subheader("Price Time Series")
+
 fig = px.line(
-    df,
-    x="date",
-    y="price",
-    title=selected_label,
+    filtered_df,
+    x="period",
+    y="value",
     labels={
-        "date": "Date",
-        "price": "USD / Unit"
-    }
+        "period": "Date",
+        "value": f"Price ({filtered_df['units'].iloc[0]})"
+    },
+    height=420
 )
+
 st.plotly_chart(fig, use_container_width=True)
 
-st.caption("Source: U.S. Energy Information Administration (EIA)")
-
 # =============================
-# Latest Price Table
+# LATEST SNAPSHOT
 # =============================
 st.subheader("Latest Price Snapshot")
 
-latest = df.iloc[-1]
+latest = filtered_df.iloc[-1]
 
-price_table = pd.DataFrame({
-    "Metric": ["Date", "Price (USD)"],
-    "Value": [latest["date"].date(), round(latest["price"], 2)]
+snapshot = pd.DataFrame({
+    "Metric": [
+        "Date",
+        "Price",
+        "Units",
+        "Benchmark",
+        "Product"
+    ],
+    "Value": [
+        latest["period"].date(),
+        round(latest["value"], 2),
+        latest["units"],
+        latest["benchmark"],
+        latest["product-name"]
+    ]
 })
 
-st.dataframe(price_table, use_container_width=True, hide_index=True)
+st.dataframe(snapshot, use_container_width=True, hide_index=True)
 
 # =============================
-# News Section
+# NEWS SECTION
 # =============================
-st.subheader("Global Migas News & Analysis")
+st.subheader("📰 Global Migas News & Analysis")
 
 news = [
     {
@@ -114,7 +137,7 @@ for article in news:
     col_img, col_text = st.columns([1, 4])
 
     with col_img:
-        st.image(article["image"], width=160)
+        st.image(article["image"], width=150)
 
     with col_text:
         st.markdown(f"**{article['title']}**")
@@ -124,7 +147,9 @@ for article in news:
     st.markdown("---")
 
 # =============================
-# Back Button
+# BACK BUTTON
 # =============================
 if st.button("⬅ Back to Dashboard"):
     st.switch_page("app.py")
+
+st.caption("Energy Price Dashboard – Detail View (Dataset-based)")
