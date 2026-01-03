@@ -139,10 +139,48 @@ else:
     st.dataframe(snapshot, use_container_width=True, hide_index=True)
 
 # =============================
+# NEWS SECTION
+# =============================
+st.subheader("Global Migas News & Analysis")
+
+news = [
+    {
+        "title": "OPEC+ Considers Production Cut",
+        "source": "Reuters",
+        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
+        "image": "images/download.jpeg"
+    },
+    {
+        "title": "Middle East Tensions Push Oil Prices Higher",
+        "source": "Bloomberg",
+        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
+        "image": "images/download (1).jpeg"
+    },
+    {
+        "title": "Global Energy Transition Impacts Oil Demand",
+        "source": "IEA",
+        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
+        "image": "images/download (2).jpeg"
+    }
+]
+
+for article in news:
+    col_img, col_text = st.columns([1, 4])
+
+    with col_img:
+        st.image(article["image"], width=150)
+
+    with col_text:
+        st.markdown(f"**{article['title']}**")
+        st.caption(article["source"])
+        st.write(article["summary"])
+
+    st.markdown("---")
+
+# =============================
 # BACK BUTTON
 # =============================
 if st.button("⬅ Back to Dashboard"):
     st.switch_page("app.py")
 
 st.caption("Energy Consumption & Production – Detail View")
-py
