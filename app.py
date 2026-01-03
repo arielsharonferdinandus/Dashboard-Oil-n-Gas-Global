@@ -146,17 +146,20 @@ news = [
     {
         "title": "OPEC+ Considers Production Cut",
         "source": "Reuters",
-        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand."
+        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
+        "image": "images/download.jpeg"
     },
     {
         "title": "Middle East Tensions Push Oil Prices Higher",
         "source": "Bloomberg",
-        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets."
+        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
+        "image": "images/download (1).jpeg"
     },
     {
         "title": "Global Energy Transition Impacts Oil Demand",
         "source": "IEA",
-        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook."
+        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
+        "image": "images/download (2).jpeg"
     }
 ]
 
