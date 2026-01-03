@@ -10,7 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🌍 Global Energy Dashboard")
+st.title("Global Energy Dashboard")
 st.caption("Oil, Gas & Energy Visualization – Prototype")
 
 # =============================
@@ -20,32 +20,27 @@ st.caption("Oil, Gas & Energy Visualization – Prototype")
 def load_price_data():
     df = pd.read_csv("data/csv/price_timeseries.csv")
     df["period"] = pd.to_datetime(df["period"])
-    df = df[df["benchmark"] == "Brent"]
-    df = df.sort_values("period").tail(90)
+
+    df = df[df["benchmark"].isin(["Brent", "WTI", "Dubai"])]
+    df = df.sort_values("period")
+
     return df
 
 
 @st.cache_data
-def load_production_oil():
-    df = pd.read_csv("data/csv/country_production_oil.csv")
-    df = (
-        df.groupby("Year", as_index=False)["Production"]
-        .sum()
-        .sort_values("Year")
-    )
+def load_prod_cons_oil():
+    prod = pd.read_csv("data/csv/country_production_oil.csv")
+    cons = pd.read_csv("data/csv/country_consumtion_oil.csv")
+
+    prod = prod.groupby("Year", as_index=False)["Production"].sum()
+    cons = cons.groupby("Year", as_index=False)["Consumtion"].sum()
+
+    df = pd.merge(prod, cons, on="Year", how="inner")
     return df
 
 
-@st.cache_data
-def load_consumption_oil():
-    df = pd.read_csv("data/csv/country_consumtion_oil.csv")
-    df = (
-        df.groupby("Year", as_index=False)["Consumtion"]
-        .sum()
-        .sort_values("Year")
-    )
-    return df
-
+price_df = load_price_data()
+prod_cons_df = load_prod_cons_oil()
 
 # =============================
 # DUMMY MAP DATA
@@ -57,54 +52,70 @@ migas_map = pd.DataFrame({
 })
 
 # =============================
-# LOAD ALL
+# DUMMY SUBSIDY vs GDP
 # =============================
-price_df = load_price_data()
-prod_oil_df = load_production_oil()
-cons_oil_df = load_consumption_oil()
+subsidy_gdp = pd.DataFrame({
+    "Country": ["Indonesia", "India", "China", "United States", "Saudi Arabia"],
+    "Fuel Subsidy (% GDP)": [2.1, 1.8, 0.9, 0.4, 3.2],
+    "GDP (Trillion USD)": [1.4, 3.4, 17.7, 26.9, 1.1]
+})
 
 # =============================
-# LAYOUT ROW 1 (3 COLUMNS)
+# ROW 1 (3 COLUMNS)
 # =============================
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.subheader("🛢️ Brent Oil Price (Spot)")
+    st.subheader("🛢️ Global Oil Price Comparison")
+
     fig = px.line(
         price_df,
         x="period",
         y="value",
-        labels={"value": "USD / Barrel", "period": "Date"},
+        color="benchmark",
+        labels={
+            "value": "USD / Barrel",
+            "period": "Date",
+            "benchmark": "Oil Type"
+        },
         height=260
     )
+
+    # Make non-selected lines slightly transparent
+    fig.update_traces(opacity=0.45)
+    fig.update_layout(
+        legend_title_text="Click to focus / hide",
+        hovermode="x unified"
+    )
+
     st.plotly_chart(fig, use_container_width=True)
 
 
 with col2:
-    st.subheader("🏭 Global Oil Production")
+    st.subheader("Global Oil Production vs Consumption")
     fig = px.line(
-        prod_oil_df,
+        prod_cons_df,
         x="Year",
-        y="Production",
-        labels={"Production": "Total Production"},
+        y=["Production", "Consumtion"],
+        labels={"value": "Volume", "variable": "Metric"},
         height=260
     )
     st.plotly_chart(fig, use_container_width=True)
 
-
 with col3:
-    st.subheader("⛽ Global Oil Consumption")
-    fig = px.line(
-        cons_oil_df,
-        x="Year",
-        y="Consumtion",
-        labels={"Consumtion": "Total Consumption"},
+    st.subheader("Fuel Subsidy vs GDP (Dummy)")
+    fig = px.scatter(
+        subsidy_gdp,
+        x="GDP (Trillion USD)",
+        y="Fuel Subsidy (% GDP)",
+        size="Fuel Subsidy (% GDP)",
+        hover_name="Country",
         height=260
     )
     st.plotly_chart(fig, use_container_width=True)
 
 # =============================
-# LAYOUT ROW 2 (MAP FULL WIDTH)
+# ROW 2 – MAP
 # =============================
 st.subheader("🗺️ Global Energy Production Map (Dummy Data)")
 
@@ -119,6 +130,44 @@ fig = px.choropleth(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
+# =============================
+# ACTION BUTTON
+# =============================
+col_btn1, col_btn2 = st.columns([3, 1])
+
+with col_btn2:
+    if st.button("📊 View Production & Consumption Detail"):
+        st.switch_page("pages/Consumption_Production.py")
+
+# =============================
+# NEWS SECTION
+# =============================
+st.subheader("📰 Global Migas News & Analysis")
+
+news = [
+    {
+        "title": "OPEC+ Considers Production Cut",
+        "source": "Reuters",
+        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand."
+    },
+    {
+        "title": "Middle East Tensions Push Oil Prices Higher",
+        "source": "Bloomberg",
+        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets."
+    },
+    {
+        "title": "Global Energy Transition Impacts Oil Demand",
+        "source": "IEA",
+        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook."
+    }
+]
+
+for article in news:
+    st.markdown(f"**{article['title']}**")
+    st.caption(article["source"])
+    st.write(article["summary"])
+    st.markdown("---")
 
 # =============================
 # FOOTER
