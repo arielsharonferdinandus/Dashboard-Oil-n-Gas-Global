@@ -66,7 +66,7 @@ subsidy_gdp = pd.DataFrame({
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.subheader("🛢️ Global Oil Price Comparison")
+    st.subheader("Global Oil Price Comparison")
 
     fig = px.line(
         price_df,
@@ -87,7 +87,6 @@ with col1:
         legend_title_text="Click to focus / hide",
         hovermode="x unified"
     )
-
     st.plotly_chart(fig, use_container_width=True)
 
     if st.button("View more..."):
@@ -103,9 +102,16 @@ with col2:
         labels={"value": "Volume", "variable": "Metric"},
         height=260
     )
+
+    fig.update_traces(opacity=0.45)
+    fig.update_layout(
+        legend_title_text="Click to focus / hide",
+        hovermode="x unified"
+    )
+    
     st.plotly_chart(fig, use_container_width=True)
 
-    if st.button("View more..."):
+    if st.button("View more.."):
         st.switch_page("pages/Consumption_Production.py")
 
 with col3:
