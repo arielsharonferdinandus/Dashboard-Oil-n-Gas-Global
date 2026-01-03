@@ -21,7 +21,7 @@ def load_price_data():
     df = pd.read_csv("data/csv/price_timeseries.csv")
     df["period"] = pd.to_datetime(df["period"])
 
-    df = df[df["benchmark"].isin(["Brent", "WTI", "Dubai"])]
+    df = df[df["benchmark"].isin(["Brent", "WTI", "Henry Hub"])]
     df = df.sort_values("period")
 
     return df
