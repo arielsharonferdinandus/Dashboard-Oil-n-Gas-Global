@@ -21,7 +21,7 @@ def load_price_data():
     df = pd.read_csv("data/csv/price_timeseries.csv")
     df["period"] = pd.to_datetime(df["period"])
 
-    df = df[df["benchmark"].isin(["Brent", "WTI", "Dubai"])]
+    df = df[df["benchmark"].isin(["Brent", "WTI", "Henry Hub"])]
     df = df.sort_values("period")
 
     return df
@@ -90,6 +90,9 @@ with col1:
 
     st.plotly_chart(fig, use_container_width=True)
 
+    if st.button("View more..."):
+        st.switch_page("pages/Harga_Minyak_Detail.py")
+
 
 with col2:
     st.subheader("Global Oil Production vs Consumption")
@@ -101,6 +104,9 @@ with col2:
         height=260
     )
     st.plotly_chart(fig, use_container_width=True)
+
+    if st.button("View more..."):
+        st.switch_page("pages/Consumption_Production.py")
 
 with col3:
     st.subheader("Fuel Subsidy vs GDP (Dummy)")
@@ -132,15 +138,6 @@ fig = px.choropleth(
 st.plotly_chart(fig, use_container_width=True)
 
 # =============================
-# ACTION BUTTON
-# =============================
-col_btn1, col_btn2 = st.columns([3, 1])
-
-with col_btn2:
-    if st.button("📊 View Production & Consumption Detail"):
-        st.switch_page("pages/Consumption_Production.py")
-
-# =============================
 # NEWS SECTION
 # =============================
 st.subheader("📰 Global Migas News & Analysis")
@@ -149,25 +146,38 @@ news = [
     {
         "title": "OPEC+ Considers Production Cut",
         "source": "Reuters",
-        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand."
+        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
+        "image": "images/download.jpeg"
     },
     {
         "title": "Middle East Tensions Push Oil Prices Higher",
         "source": "Bloomberg",
-        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets."
+        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
+        "image": "images/download (1).jpeg"
     },
     {
         "title": "Global Energy Transition Impacts Oil Demand",
         "source": "IEA",
-        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook."
+        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
+        "image": "images/download (2).jpeg"
     }
 ]
 
+# -----------------------------
+# News Section
+# -----------------------------
+st.subheader("Global Migas News & Analysis")
+
 for article in news:
-    st.markdown(f"**{article['title']}**")
-    st.caption(article["source"])
-    st.write(article["summary"])
-    st.markdown("---")
+    col_img, col_text = st.columns([1, 4])
+
+    with col_img:
+        st.image(article["image"], width=200)
+
+    with col_text:
+        st.markdown(f"**{article['title']}**")
+        st.caption(article["source"])
+        st.write(article["summary"])
 
 # =============================
 # FOOTER
