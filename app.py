@@ -11,6 +11,16 @@ st.set_page_config(
     page_title="Global Energy Dashboard",
     layout="wide"
 )
+st.markdown(
+    """
+    <style>
+        .block-container {
+            padding-left: 0rem;
+            padding-right: 0rem;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
 
 st.title("Global Energy Dashboard")
 st.caption("Oil, Gas & Energy Visualization – DuckDB-based Prototype")
@@ -172,15 +182,11 @@ fig = px.choropleth(
     hover_name="Country",
     projection="equirectangular",
     color_continuous_scale="Viridis",
-    height=420
+    height=520
 )
 
-fig.update_geos(
-    showcoastlines=True,
-    showcountries=True,
-    countrycolor="White",
-    showframe=False
-)
+st.plotly_chart(fig, use_container_width=True)
+
 
 st.plotly_chart(fig, use_container_width=True)
 
