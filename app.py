@@ -213,6 +213,9 @@ fig = px.choropleth(
 )
 st.plotly_chart(fig, use_container_width=True)
 
+if st.button("Map Detail..."):
+        st.switch_page("pages/Map_Detail.py")
+
 # =============================
 # NEWS SECTION
 # =============================
