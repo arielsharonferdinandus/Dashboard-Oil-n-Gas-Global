@@ -148,7 +148,7 @@ with col2:
 
     with c1:
         if st.button(
-            "🛢️ Oil",
+            "Oil",
             use_container_width=True,
             type="primary" if st.session_state.energy_type == "Oil" else "secondary"
         ):
@@ -156,7 +156,7 @@ with col2:
 
     with c2:
         if st.button(
-            "🔥 Gas",
+            "Gas",
             use_container_width=True,
             type="primary" if st.session_state.energy_type == "Gas" else "secondary"
         ):
