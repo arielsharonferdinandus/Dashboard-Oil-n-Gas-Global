@@ -123,7 +123,7 @@ with col1:
                   height=260)
     fig.update_traces(opacity=0.45)
     fig.update_layout(legend_title_text="Click to focus / hide", hovermode="x unified")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=False)
 
     if st.button("View more..."):
         st.switch_page("pages/Harga_Minyak_Detail.py")
