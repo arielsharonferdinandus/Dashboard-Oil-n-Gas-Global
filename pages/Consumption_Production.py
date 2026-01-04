@@ -1,186 +1,57 @@
 import streamlit as st
-import pandas as pd
 import plotly.express as px
-from pathlib import Path
+import pandas as pd
+from utils.duckdb_conn import get_duckdb_connection
 
-# =============================
-# CONFIG
-# =============================
-st.set_page_config(
-    page_title="Energy Consumption & Production – Detail View",
-    layout="wide"
-)
+st.set_page_config(page_title="Energy Consumption & Production", layout="wide")
+st.title("Energy Consumption & Production – Detail View")
 
-st.title("⚡ Energy Consumption & Production – Detail View")
-st.caption("Country-Level Oil & Gas Data (Dataset-based)")
-
-DATA_DIR = Path("data/csv")
-
-# =============================
-# LOAD DATA
-# =============================
 @st.cache_data
 def load_energy_data():
-    # Consumption
-    cons_oil = pd.read_csv(DATA_DIR / "country_consumtion_oil.csv")
-    cons_gas = pd.read_csv(DATA_DIR / "country_consumtion_gas.csv")
+    conn = get_duckdb_connection()
 
-    cons_oil["Type"] = "Oil"
-    cons_gas["Type"] = "Gas"
+    query = """
+        SELECT Year, Country, Consumtion, 'Oil' AS Type
+        FROM energy.main.oil_cons
 
-    cons = pd.concat([cons_oil, cons_gas], ignore_index=True)
+        UNION ALL
+        SELECT Year, Country, Production AS Consumtion, 'Oil'
+        FROM energy.main.oil_prod
 
-    # Production
-    prod_oil = pd.read_csv(DATA_DIR / "country_production_oil.csv")
-    prod_gas = pd.read_csv(DATA_DIR / "country_production_gas.csv")
+        UNION ALL
+        SELECT Year, Country, Consumtion, 'Gas'
+        FROM energy.main.gas_cons
 
-    prod_oil["Type"] = "Oil"
-    prod_gas["Type"] = "Gas"
+        UNION ALL
+        SELECT Year, Country, Production AS Consumtion, 'Gas'
+        FROM energy.main.gas_prod
+    """
+    df = conn.execute(query).fetchdf()
+    conn.close()
+    return df
 
-    prod = pd.concat([prod_oil, prod_gas], ignore_index=True)
 
-    return cons, prod
-
-
-cons_df, prod_df = load_energy_data()
-
-# =============================
-# SELECTORS
-# =============================
-st.subheader("Energy Data Explorer")
+df = load_energy_data()
 
 col1, col2, col3 = st.columns(3)
-
 with col1:
-    selected_type = st.selectbox(
-        "Energy Type",
-        sorted(cons_df["Type"].unique())
-    )
-
+    energy_type = st.selectbox("Energy Type", sorted(df["Type"].unique()))
 with col2:
-    selected_country = st.selectbox(
-        "Country",
-        sorted(cons_df["Country"].dropna().unique())
-    )
-
+    country = st.selectbox("Country", sorted(df["Country"].unique()))
 with col3:
-    view_mode = st.selectbox(
-        "View Mode",
-        ["Yearly Trend", "Latest Snapshot"]
-    )
+    view = st.selectbox("View Mode", ["Yearly Trend", "Latest Snapshot"])
 
-# =============================
-# FILTER DATA
-# =============================
-cons_filtered = cons_df[
-    (cons_df["Type"] == selected_type) &
-    (cons_df["Country"] == selected_country)
-]
+filtered = df[(df["Type"] == energy_type) & (df["Country"] == country)]
 
-prod_filtered = prod_df[
-    (prod_df["Type"] == selected_type) &
-    (prod_df["Country"] == selected_country)
-]
-
-merged_df = pd.merge(
-    cons_filtered[["Year", "Consumtion"]],
-    prod_filtered[["Year", "Production"]],
-    on="Year",
-    how="outer"
-).sort_values("Year")
-
-# =============================
-# YEARLY TREND
-# =============================
-if view_mode == "Yearly Trend":
-    st.subheader(f"{selected_country} – {selected_type} Consumption vs Production")
-
-    fig = px.line(
-        merged_df,
-        x="Year",
-        y=["Consumtion", "Production"],
-        labels={
-            "value": "Volume",
-            "variable": "Metric"
-        },
-        height=420
-    )
-
-    fig.update_traces(opacity=0.45)
-    fig.update_layout(hovermode="x unified")
-
+if view == "Yearly Trend":
+    fig = px.line(filtered, x="Year", y="Consumtion", height=420)
     st.plotly_chart(fig, use_container_width=True)
-
-# =============================
-# LATEST SNAPSHOT
-# =============================
 else:
-    st.subheader(f"{selected_country} – Latest {selected_type} Snapshot")
+    latest = filtered.sort_values("Year").iloc[-1]
+    st.dataframe(pd.DataFrame({
+        "Metric": ["Year", "Value"],
+        "Value": [latest["Year"], latest["Consumtion"]]
+    }), use_container_width=True, hide_index=True)
 
-    latest_row = merged_df.dropna().iloc[-1]
-
-    snapshot = pd.DataFrame({
-        "Metric": [
-            "Year",
-            "Consumption",
-            "Production",
-            "Energy Type",
-            "Country"
-        ],
-        "Value": [
-            int(latest_row["Year"]),
-            round(latest_row["Consumtion"], 2),
-            round(latest_row["Production"], 2),
-            selected_type,
-            selected_country
-        ]
-    })
-
-    st.dataframe(snapshot, use_container_width=True, hide_index=True)
-
-# =============================
-# NEWS SECTION
-# =============================
-st.subheader("Global Migas News & Analysis")
-
-news = [
-    {
-        "title": "OPEC+ Considers Production Cut",
-        "source": "Reuters",
-        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
-        "image": "images/download.jpeg"
-    },
-    {
-        "title": "Middle East Tensions Push Oil Prices Higher",
-        "source": "Bloomberg",
-        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
-        "image": "images/download (1).jpeg"
-    },
-    {
-        "title": "Global Energy Transition Impacts Oil Demand",
-        "source": "IEA",
-        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
-        "image": "images/download (2).jpeg"
-    }
-]
-
-for article in news:
-    col_img, col_text = st.columns([1, 4])
-
-    with col_img:
-        st.image(article["image"], width=150)
-
-    with col_text:
-        st.markdown(f"**{article['title']}**")
-        st.caption(article["source"])
-        st.write(article["summary"])
-
-    st.markdown("---")
-
-# =============================
-# BACK BUTTON
-# =============================
 if st.button("⬅ Back to Dashboard"):
     st.switch_page("app.py")
-
-st.caption("Energy Consumption & Production – Detail View")
