@@ -43,7 +43,7 @@ def load_energy_data(db_path=DB_PATH):
     if "oil_cons" in tables:
         try:
             cons_oil = conn.execute("""
-                SELECT Country, Year, Consumption AS Consumtion, iso3
+                SELECT Country, Year, Consumtion AS Consumption, iso3
                 FROM oil_cons
             """).df()
             cons_oil["Type"] = "Oil"
@@ -54,7 +54,7 @@ def load_energy_data(db_path=DB_PATH):
     if "gas_cons" in tables:
         try:
             cons_gas = conn.execute("""
-                SELECT Country, Year, Consumption AS Consumtion, iso3
+                SELECT Country, Year, Consumtion AS Consumption, iso3
                 FROM gas_cons
             """).df()
             cons_gas["Type"] = "Gas"
