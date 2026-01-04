@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("⚡ Energy Consumption & Production – Detail View")
+st.title("Energy Consumption & Production – Detail View")
 st.caption("Country-Level Oil & Gas Data (DuckDB-based)")
 
 # =============================
