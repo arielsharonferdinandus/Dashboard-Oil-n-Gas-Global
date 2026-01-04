@@ -15,20 +15,13 @@ st.title("Global Energy Production – Map Detail")
 st.caption("Country-Level Production Data (DuckDB-based)")
 
 # =============================
-# DUCKDB CONNECTION
-# =============================
-@st.cache_data
-def get_duckdb_connection(db_path="data/energy.duckdb"):
-    conn = duckdb.connect(database=db_path, read_only=True)
-    return conn
-
-conn = get_duckdb_connection()
-
-# =============================
 # LOAD DATA
 # =============================
 @st.cache_data
-def load_map_data():
+def load_map_data(db_path="data/energy.duckdb"):
+    # Open connection INSIDE the cached function
+    conn = duckdb.connect(database=db_path, read_only=True)
+    
     # Oil production
     oil_prod = conn.execute("""
         SELECT Country, iso3, Year, Production
@@ -47,6 +40,7 @@ def load_map_data():
     """).df()
     gas_prod["Type"] = "Gas"
 
+    # Combine oil and gas
     df = pd.concat([oil_prod, gas_prod], ignore_index=True)
     return df
 
@@ -99,7 +93,7 @@ else:
     st.info("No production data available for the selected type/year.")
 
 # =============================
-# LATEST SNAPSHOT TABLE
+# TOP COUNTRIES TABLE
 # =============================
 st.subheader(f"Top Production Countries – {selected_type} {selected_year}")
 

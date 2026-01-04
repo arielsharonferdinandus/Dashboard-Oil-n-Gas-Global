@@ -15,20 +15,13 @@ st.title("Energy Consumption & Production – Detail View")
 st.caption("Country-Level Oil & Gas Data (DuckDB-based)")
 
 # =============================
-# DUCKDB CONNECTION
-# =============================
-@st.cache_data
-def get_duckdb_connection(db_path="data/energy.duckdb"):
-    conn = duckdb.connect(database=db_path, read_only=True)
-    return conn
-
-conn = get_duckdb_connection()
-
-# =============================
 # LOAD DATA
 # =============================
 @st.cache_data
-def load_energy_data():
+def load_energy_data(db_path="data/energy.duckdb"):
+    # Open connection inside function (do NOT cache connection itself)
+    conn = duckdb.connect(database=db_path, read_only=True)
+
     # --- Consumption ---
     cons_oil = conn.execute("""
         SELECT Country, Year, Consumtion, iso3
@@ -36,7 +29,6 @@ def load_energy_data():
     """).df()
     cons_oil["Type"] = "Oil"
 
-    # If gas consumption table exists
     tables = conn.execute("SHOW TABLES").df()['table_name'].tolist()
     if 'gas_cons' in tables:
         cons_gas = conn.execute("""
@@ -45,7 +37,6 @@ def load_energy_data():
         """).df()
         cons_gas["Type"] = "Gas"
     else:
-        # If no gas consumption table, create empty
         cons_gas = pd.DataFrame(columns=["Country","Year","Consumtion","iso3","Type"])
 
     cons = pd.concat([cons_oil, cons_gas], ignore_index=True)
@@ -128,10 +119,7 @@ if view_mode == "Yearly Trend":
         merged_df,
         x="Year",
         y=["Consumtion", "Production"],
-        labels={
-            "value": "Volume",
-            "variable": "Metric"
-        },
+        labels={"value": "Volume", "variable": "Metric"},
         height=420
     )
 
@@ -148,15 +136,8 @@ else:
 
     if not merged_df.dropna().empty:
         latest_row = merged_df.dropna().iloc[-1]
-
         snapshot = pd.DataFrame({
-            "Metric": [
-                "Year",
-                "Consumption",
-                "Production",
-                "Energy Type",
-                "Country"
-            ],
+            "Metric": ["Year", "Consumption", "Production", "Energy Type", "Country"],
             "Value": [
                 int(latest_row["Year"]),
                 round(latest_row["Consumtion"], 2),
@@ -165,7 +146,6 @@ else:
                 selected_country
             ]
         })
-
         st.dataframe(snapshot, use_container_width=True, hide_index=True)
     else:
         st.info("No data available for the selected country/type.")
@@ -174,32 +154,21 @@ else:
 # NEWS SECTION
 # =============================
 st.subheader("Global Migas News & Analysis")
-
 news = [
-    {
-        "title": "OPEC+ Considers Production Cut",
-        "source": "Reuters",
-        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
-        "image": "images/download.jpeg"
-    },
-    {
-        "title": "Middle East Tensions Push Oil Prices Higher",
-        "source": "Bloomberg",
-        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
-        "image": "images/download (1).jpeg"
-    },
-    {
-        "title": "Global Energy Transition Impacts Oil Demand",
-        "source": "IEA",
-        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
-        "image": "images/download (2).jpeg"
-    }
+    {"title": "OPEC+ Considers Production Cut", "source": "Reuters",
+     "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
+     "image": "images/download.jpeg"},
+    {"title": "Middle East Tensions Push Oil Prices Higher", "source": "Bloomberg",
+     "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
+     "image": "images/download (1).jpeg"},
+    {"title": "Global Energy Transition Impacts Oil Demand", "source": "IEA",
+     "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
+     "image": "images/download (2).jpeg"}
 ]
 
 for article in news:
     col_img, col_text = st.columns([1, 4])
-    with col_img:
-        st.image(article["image"], width=150)
+    with col_img: st.image(article["image"], width=150)
     with col_text:
         st.markdown(f"**{article['title']}**")
         st.caption(article["source"])
