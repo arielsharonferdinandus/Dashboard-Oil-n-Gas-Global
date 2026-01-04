@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import duckdb
 
 # =============================
 # CONFIG
@@ -14,60 +15,88 @@ st.title("Global Energy Dashboard")
 st.caption("Oil, Gas & Energy Visualization – Prototype")
 
 # =============================
+# CONNECT DUCKDB
+# =============================
+@st.cache_data
+def get_duckdb_connection(db_path="data/energy.duckdb"):
+    conn = duckdb.connect(database=db_path, read_only=True)
+    return conn
+
+conn = get_duckdb_connection()
+
+# =============================
 # LOAD DATA
 # =============================
 @st.cache_data
 def load_price_data():
-    df = pd.read_csv("data/csv/price_timeseries.csv")
+    query = """
+    SELECT date AS period, price AS value, benchmark
+    FROM price
+    WHERE benchmark IN ('Brent', 'WTI', 'Henry Hub')
+    ORDER BY date
+    """
+    df = conn.execute(query).df()
     df["period"] = pd.to_datetime(df["period"])
-
-    df = df[df["benchmark"].isin(["Brent", "WTI", "Henry Hub"])]
-    df = df.sort_values("period")
-
     return df
-
 
 @st.cache_data
 def load_prod_cons():
     # --- OIL ---
-    prod_oil = pd.read_csv("data/csv/country_production_oil.csv")
-    cons_oil = pd.read_csv("data/csv/country_consumtion_oil.csv")
+    oil_prod = conn.execute("""
+        SELECT Year, SUM(Production) AS Production
+        FROM oil_prod
+        GROUP BY Year
+    """).df()
 
-    prod_oil = prod_oil.groupby("Year", as_index=False)["Production"].sum()
-    cons_oil = cons_oil.groupby("Year", as_index=False)["Consumtion"].sum()
+    oil_cons = conn.execute("""
+        SELECT Year, SUM(Consumtion) AS Consumtion
+        FROM oil_cons
+        GROUP BY Year
+    """).df()
 
-    oil = pd.merge(prod_oil, cons_oil, on="Year", how="outer")
+    oil = pd.merge(oil_prod, oil_cons, on="Year", how="outer")
     oil["Energy"] = "Oil"
 
     # --- GAS ---
-    prod_gas = pd.read_csv("data/csv/country_production_gas.csv")
-    cons_gas = pd.read_csv("data/csv/country_consumtion_gas.csv")
+    gas_prod = conn.execute("""
+        SELECT production_year AS Year, SUM(production) AS Production
+        FROM goget
+        WHERE commodity='Gas'
+        GROUP BY production_year
+    """).df()
 
-    prod_gas = prod_gas.groupby("Year", as_index=False)["Production"].sum()
-    cons_gas = cons_gas.groupby("Year", as_index=False)["Consumtion"].sum()
+    gas_cons = pd.DataFrame()  # If you don't have a gas consumption table, fill with zeros
+    if 'gas_cons' in conn.execute("SHOW TABLES").df()['table_name'].values:
+        gas_cons = conn.execute("""
+            SELECT Year, SUM(Consumtion) AS Consumtion
+            FROM gas_cons
+            GROUP BY Year
+        """).df()
+    else:
+        gas_cons = gas_prod.copy()
+        gas_cons["Consumtion"] = 0
 
-    gas = pd.merge(prod_gas, cons_gas, on="Year", how="outer")
+    gas = pd.merge(gas_prod, gas_cons, on="Year", how="outer")
     gas["Energy"] = "Gas"
 
     # --- COMBINE ---
     df = pd.concat([oil, gas], ignore_index=True)
     df = df.fillna(0).sort_values("Year")
-
     return df
 
-
+@st.cache_data
+def load_map_data():
+    query = """
+    SELECT country AS Country, iso3, SUM(production) AS Production
+    FROM goget
+    GROUP BY country, iso3
+    """
+    df = conn.execute(query).df()
+    return df
 
 price_df = load_price_data()
 prod_cons_df = load_prod_cons()
-
-# =============================
-# DUMMY MAP DATA
-# =============================
-migas_map = pd.DataFrame({
-    "Country": ["United States", "Saudi Arabia", "Russia", "China", "India", "Indonesia"],
-    "iso3": ["USA", "SAU", "RUS", "CHN", "IND", "IDN"],
-    "Production": [18.5, 12.1, 10.8, 4.2, 0.8, 0.7]
-})
+migas_map = load_map_data()
 
 # =============================
 # DUMMY SUBSIDY vs GDP
@@ -99,7 +128,6 @@ with col1:
         height=260
     )
 
-    # Make non-selected lines slightly transparent
     fig.update_traces(opacity=0.45)
     fig.update_layout(
         legend_title_text="Click to focus / hide",
@@ -110,13 +138,9 @@ with col1:
     if st.button("View more..."):
         st.switch_page("pages/Harga_Minyak_Detail.py")
 
-
 with col2:
     st.subheader("Global Production vs Consumption")
 
-    # ---------------------------------
-    # Energy Type Card Selector
-    # ---------------------------------
     if "energy_type" not in st.session_state:
         st.session_state.energy_type = "Oil"
 
@@ -139,27 +163,15 @@ with col2:
             st.session_state.energy_type = "Gas"
 
     energy_type = st.session_state.energy_type
-
     st.caption(f"Selected energy type: **{energy_type}**")
 
-    # ---------------------------------
-    # FILTER DATA
-    # ---------------------------------
-    filtered_df = prod_cons_df[
-        prod_cons_df["Energy"] == energy_type
-    ]
+    filtered_df = prod_cons_df[prod_cons_df["Energy"] == energy_type]
 
-    # ---------------------------------
-    # CHART
-    # ---------------------------------
     fig = px.line(
         filtered_df,
         x="Year",
         y=["Production", "Consumtion"],
-        labels={
-            "value": "Volume",
-            "variable": "Metric"
-        },
+        labels={"value": "Volume", "variable": "Metric"},
         height=260
     )
 
@@ -168,13 +180,10 @@ with col2:
         legend_title_text="Click to focus / hide",
         hovermode="x unified"
     )
-
     st.plotly_chart(fig, use_container_width=True)
 
     if st.button("View more.."):
         st.switch_page("pages/Consumption_Production.py")
-
-
 
 with col3:
     st.subheader("Fuel Subsidy vs GDP (Dummy)")
@@ -191,7 +200,7 @@ with col3:
 # =============================
 # ROW 2 – MAP
 # =============================
-st.subheader("Global Energy Production Map (Dummy Data)")
+st.subheader("Global Energy Production Map (DuckDB Data)")
 
 fig = px.choropleth(
     migas_map,
@@ -202,7 +211,6 @@ fig = px.choropleth(
     color_continuous_scale="YlOrRd",
     height=420
 )
-
 st.plotly_chart(fig, use_container_width=True)
 
 # =============================
@@ -233,18 +241,15 @@ news = [
 
 for article in news:
     col_img, col_text = st.columns([1, 4])
-
     with col_img:
         st.image(article["image"], width=150)
-
     with col_text:
         st.markdown(f"**{article['title']}**")
         st.caption(article["source"])
         st.write(article["summary"])
-
     st.markdown("---")
 
 # =============================
 # FOOTER
 # =============================
-st.caption("Streamlit Energy Dashboard – Dataset-based Prototype")
+st.caption("Streamlit Energy Dashboard – DuckDB-based Prototype")
