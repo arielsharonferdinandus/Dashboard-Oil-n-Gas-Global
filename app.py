@@ -166,7 +166,7 @@ with col2:
         st.switch_page("pages/Consumption_Production.py")
 
 with col3:
-    st.subheader("Fuel Subsidy vs GDP (Dummy)")
+    st.subheader("Fuel Subsidy vs GDP")
     fig = px.scatter(subsidy_gdp, x="GDP (Trillion USD)", y="Fuel Subsidy (% GDP)",
                      size="Fuel Subsidy (% GDP)", hover_name="Country", height=260)
     st.plotly_chart(fig, use_container_width=True)
@@ -174,13 +174,13 @@ with col3:
 # =============================
 # ROW 2 – MAP
 # =============================
-st.subheader("Global Energy Production Map (DuckDB Data)")
+st.subheader("Global Energy Production Map")
 fig = px.choropleth(
     migas_map,
     locations="iso3",
     color="Production",
     hover_name="Country",
-    projection="natural earth",
+    projection="robinson",
     color_continuous_scale="Blues",
     height=520
 )
