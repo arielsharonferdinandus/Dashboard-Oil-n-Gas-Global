@@ -180,13 +180,10 @@ fig = px.choropleth(
     locations="iso3",
     color="Production",
     hover_name="Country",
-    projection="equirectangular",
-    color_continuous_scale="Viridis",
+    projection="orthographic",
+    color_continuous_scale="Blues",
     height=520
 )
-
-st.plotly_chart(fig, use_container_width=True)
-
 
 st.plotly_chart(fig, use_container_width=True)
 
