@@ -114,14 +114,44 @@ with col1:
 with col2:
     st.subheader("Global Production vs Consumption")
 
-    energy_type = st.selectbox(
-        "Select Energy Type",
-        ["Oil", "Gas"],
-        key="energy_selector"
-    )
+    # ---------------------------------
+    # Energy Type Card Selector
+    # ---------------------------------
+    if "energy_type" not in st.session_state:
+        st.session_state.energy_type = "Oil"
 
-    filtered_df = prod_cons_df[prod_cons_df["Energy"] == energy_type]
+    c1, c2 = st.columns(2)
 
+    with c1:
+        if st.button(
+            "🛢️ Oil",
+            use_container_width=True,
+            type="primary" if st.session_state.energy_type == "Oil" else "secondary"
+        ):
+            st.session_state.energy_type = "Oil"
+
+    with c2:
+        if st.button(
+            "🔥 Gas",
+            use_container_width=True,
+            type="primary" if st.session_state.energy_type == "Gas" else "secondary"
+        ):
+            st.session_state.energy_type = "Gas"
+
+    energy_type = st.session_state.energy_type
+
+    st.caption(f"Selected energy type: **{energy_type}**")
+
+    # ---------------------------------
+    # FILTER DATA
+    # ---------------------------------
+    filtered_df = prod_cons_df[
+        prod_cons_df["Energy"] == energy_type
+    ]
+
+    # ---------------------------------
+    # CHART
+    # ---------------------------------
     fig = px.line(
         filtered_df,
         x="Year",
@@ -143,6 +173,7 @@ with col2:
 
     if st.button("View more.."):
         st.switch_page("pages/Consumption_Production.py")
+
 
 
 with col3:
