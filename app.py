@@ -165,9 +165,23 @@ with col3:
 # ROW 2 – MAP
 # =============================
 st.subheader("Global Energy Production Map (DuckDB Data)")
-fig = px.choropleth(migas_map, locations="iso3", color="Production",
-                    hover_name="Country", projection="natural earth",
-                    color_continuous_scale="YlOrRd", height=420, width=1200)
+fig = px.choropleth(
+    migas_map,
+    locations="iso3",
+    color="Production",
+    hover_name="Country",
+    projection="equirectangular",
+    color_continuous_scale="Viridis",
+    height=420
+)
+
+fig.update_geos(
+    showcoastlines=True,
+    showcountries=True,
+    countrycolor="White",
+    showframe=False
+)
+
 st.plotly_chart(fig, use_container_width=True)
 
 if st.button("Map Detail..."):
