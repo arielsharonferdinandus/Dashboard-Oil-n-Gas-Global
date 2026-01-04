@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import duckdb
+from pathlib import Path
 
 # =============================
 # CONFIG
@@ -14,54 +15,96 @@ st.set_page_config(
 st.title("Energy Consumption & Production – Detail View")
 st.caption("Country-Level Oil & Gas Data (DuckDB-based)")
 
+DB_PATH = Path("data/db/energy.duckdb")
+
 # =============================
 # LOAD DATA
 # =============================
 @st.cache_data
-def load_energy_data(db_path="data/db/energy.duckdb"):
-    # Open connection inside function (do NOT cache connection itself)
-    conn = duckdb.connect(database=db_path, read_only=True)
+def load_energy_data(db_path=DB_PATH):
+    if not db_path.exists():
+        st.error(f"DuckDB file not found: {db_path}")
+        # return empty DataFrames
+        return pd.DataFrame(), pd.DataFrame()
+
+    conn = duckdb.connect(database=str(db_path), read_only=True)
+
+    # --- Check existing tables ---
+    try:
+        tables_df = conn.execute("SHOW TABLES").df()
+        table_col = [c for c in tables_df.columns if c.lower() in ("name","table_name")][0]
+        tables = tables_df[table_col].tolist()
+    except Exception as e:
+        st.warning(f"Failed to list tables: {e}")
+        tables = []
 
     # --- Consumption ---
-    cons_oil = conn.execute("""
-        SELECT Country, Year, Consumtion, iso3
-        FROM oil_cons
-    """).df()
-    cons_oil["Type"] = "Oil"
+    cons_dfs = []
+    if "oil_cons" in tables:
+        try:
+            cons_oil = conn.execute("""
+                SELECT Country, Year, Consumption AS Consumtion, iso3
+                FROM oil_cons
+            """).df()
+            cons_oil["Type"] = "Oil"
+            cons_dfs.append(cons_oil)
+        except Exception as e:
+            st.warning(f"Failed to load oil consumption: {e}")
 
-    tables = conn.execute("SHOW TABLES").df()['table_name'].tolist()
-    if 'gas_cons' in tables:
-        cons_gas = conn.execute("""
-            SELECT Country, Year, Consumtion, iso3
-            FROM gas_cons
-        """).df()
-        cons_gas["Type"] = "Gas"
+    if "gas_cons" in tables:
+        try:
+            cons_gas = conn.execute("""
+                SELECT Country, Year, Consumption AS Consumtion, iso3
+                FROM gas_cons
+            """).df()
+            cons_gas["Type"] = "Gas"
+            cons_dfs.append(cons_gas)
+        except Exception as e:
+            st.warning(f"Failed to load gas consumption: {e}")
+
+    if cons_dfs:
+        cons = pd.concat(cons_dfs, ignore_index=True)
     else:
-        cons_gas = pd.DataFrame(columns=["Country","Year","Consumtion","iso3","Type"])
-
-    cons = pd.concat([cons_oil, cons_gas], ignore_index=True)
+        cons = pd.DataFrame(columns=["Country","Year","Consumtion","iso3","Type"])
 
     # --- Production ---
-    prod_oil = conn.execute("""
-        SELECT Country, Year, Production, iso3
-        FROM oil_prod
-    """).df()
-    prod_oil["Type"] = "Oil"
+    prod_dfs = []
+    if "oil_prod" in tables:
+        try:
+            prod_oil = conn.execute("""
+                SELECT Country, Year, Production, iso3
+                FROM oil_prod
+            """).df()
+            prod_oil["Type"] = "Oil"
+            prod_dfs.append(prod_oil)
+        except Exception as e:
+            st.warning(f"Failed to load oil production: {e}")
 
-    prod_gas = conn.execute("""
-        SELECT country AS Country,
-               production_year AS Year,
-               production AS Production,
-               iso3
-        FROM goget
-        WHERE commodity='Gas'
-    """).df()
-    prod_gas["Type"] = "Gas"
+    if "goget" in tables:
+        try:
+            prod_gas = conn.execute("""
+                SELECT country AS Country,
+                       production_year AS Year,
+                       production AS Production,
+                       iso3
+                FROM goget
+                WHERE commodity='Gas'
+            """).df()
+            prod_gas["Type"] = "Gas"
+            prod_dfs.append(prod_gas)
+        except Exception as e:
+            st.warning(f"Failed to load gas production: {e}")
 
-    prod = pd.concat([prod_oil, prod_gas], ignore_index=True)
+    if prod_dfs:
+        prod = pd.concat(prod_dfs, ignore_index=True)
+    else:
+        prod = pd.DataFrame(columns=["Country","Year","Production","iso3","Type"])
 
     return cons, prod
 
+# =============================
+# LOAD DATA
+# =============================
 cons_df, prod_df = load_energy_data()
 
 # =============================
@@ -74,13 +117,13 @@ col1, col2, col3 = st.columns(3)
 with col1:
     selected_type = st.selectbox(
         "Energy Type",
-        sorted(cons_df["Type"].unique())
+        sorted(cons_df["Type"].unique()) if not cons_df.empty else []
     )
 
 with col2:
     selected_country = st.selectbox(
         "Country",
-        sorted(cons_df["Country"].dropna().unique())
+        sorted(cons_df["Country"].dropna().unique()) if not cons_df.empty else []
     )
 
 with col3:
@@ -92,48 +135,50 @@ with col3:
 # =============================
 # FILTER DATA
 # =============================
-cons_filtered = cons_df[
-    (cons_df["Type"] == selected_type) &
-    (cons_df["Country"] == selected_country)
-]
+if not cons_df.empty and not prod_df.empty:
+    cons_filtered = cons_df[
+        (cons_df["Type"] == selected_type) &
+        (cons_df["Country"] == selected_country)
+    ]
 
-prod_filtered = prod_df[
-    (prod_df["Type"] == selected_type) &
-    (prod_df["Country"] == selected_country)
-]
+    prod_filtered = prod_df[
+        (prod_df["Type"] == selected_type) &
+        (prod_df["Country"] == selected_country)
+    ]
 
-merged_df = pd.merge(
-    cons_filtered[["Year", "Consumtion"]],
-    prod_filtered[["Year", "Production"]],
-    on="Year",
-    how="outer"
-).sort_values("Year")
+    merged_df = pd.merge(
+        cons_filtered[["Year", "Consumtion"]],
+        prod_filtered[["Year", "Production"]],
+        on="Year",
+        how="outer"
+    ).sort_values("Year")
+else:
+    merged_df = pd.DataFrame(columns=["Year","Consumtion","Production"])
 
 # =============================
 # YEARLY TREND
 # =============================
 if view_mode == "Yearly Trend":
     st.subheader(f"{selected_country} – {selected_type} Consumption vs Production")
-
-    fig = px.line(
-        merged_df,
-        x="Year",
-        y=["Consumtion", "Production"],
-        labels={"value": "Volume", "variable": "Metric"},
-        height=420
-    )
-
-    fig.update_traces(opacity=0.45)
-    fig.update_layout(hovermode="x unified")
-
-    st.plotly_chart(fig, use_container_width=True)
+    if not merged_df.empty:
+        fig = px.line(
+            merged_df,
+            x="Year",
+            y=["Consumtion", "Production"],
+            labels={"value": "Volume", "variable": "Metric"},
+            height=420
+        )
+        fig.update_traces(opacity=0.45)
+        fig.update_layout(hovermode="x unified")
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No data available to display.")
 
 # =============================
 # LATEST SNAPSHOT
 # =============================
 else:
     st.subheader(f"{selected_country} – Latest {selected_type} Snapshot")
-
     if not merged_df.dropna().empty:
         latest_row = merged_df.dropna().iloc[-1]
         snapshot = pd.DataFrame({
