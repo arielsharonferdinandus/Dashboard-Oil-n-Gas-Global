@@ -180,7 +180,7 @@ fig = px.choropleth(
     locations="iso3",
     color="Production",
     hover_name="Country",
-    projection="orthographic",
+    projection="natural earth",
     color_continuous_scale="Blues",
     height=520
 )
