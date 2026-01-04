@@ -134,7 +134,7 @@ with col2:
     if "energy_type" not in st.session_state:
         st.session_state.energy_type = "Oil"
 
-    c1, c2 = st.columns(2, use_container_width=True)
+    c1, c2 = st.columns(2)
     with c1:
         if st.button("Oil", type="primary" if st.session_state.energy_type=="Oil" else "secondary"):
             st.session_state.energy_type = "Oil"
