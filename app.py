@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import duckdb
+from pathlib import Path
 
 # =============================
 # CONFIG
@@ -15,57 +16,89 @@ st.title("Global Energy Dashboard")
 st.caption("Oil, Gas & Energy Visualization – DuckDB-based Prototype")
 
 # =============================
-# LOAD DATA (DuckDB Queries)
+# LOAD DATA FUNCTIONS
 # =============================
-@st.cache_data
-def load_price_data(db_path="data/db/energy.duckdb"):
-    # Open connection inside function (do NOT cache connection itself)
-    conn = duckdb.connect(database=db_path, read_only=True)
-    df = conn.execute("""
-        SELECT date AS period, price AS value, benchmark
-        FROM price
-        WHERE benchmark IN ('Brent', 'WTI', 'Henry Hub')
-        ORDER BY date
-    """).df()
-    df["period"] = pd.to_datetime(df["period"])
-    return df
+DB_PATH = Path("data/db/energy.duckdb")
 
 @st.cache_data
-def load_prod_cons(db_path="data/energy.duckdb"):
-    conn = duckdb.connect(database=db_path, read_only=True)
-
-    # Oil
-    oil_prod = conn.execute("SELECT Year, SUM(Production) AS Production FROM oil_prod GROUP BY Year").df()
-    oil_cons = conn.execute("SELECT Year, SUM(Consumtion) AS Consumtion FROM oil_cons GROUP BY Year").df()
-    oil = pd.merge(oil_prod, oil_cons, on="Year", how="outer")
-    oil["Energy"] = "Oil"
-
-    # Gas
-    gas_prod = conn.execute("""
-        SELECT production_year AS Year, SUM(production) AS Production
-        FROM goget
-        WHERE commodity='Gas'
-        GROUP BY production_year
-    """).df()
-    # Gas consumption table may not exist; fill with 0
-    gas_cons = pd.DataFrame({"Year": gas_prod["Year"], "Consumtion": 0})
-    gas = pd.merge(gas_prod, gas_cons, on="Year", how="outer")
-    gas["Energy"] = "Gas"
-
-    df = pd.concat([oil, gas], ignore_index=True).fillna(0).sort_values("Year")
-    return df
+def load_price_data(db_path=DB_PATH):
+    if not db_path.exists():
+        st.error(f"DuckDB file not found: {db_path}")
+        return pd.DataFrame(columns=["period","value","benchmark"])
+    conn = duckdb.connect(database=str(db_path), read_only=True)
+    try:
+        df = conn.execute("""
+            SELECT date AS period, price AS value, benchmark
+            FROM price
+            WHERE benchmark IN ('Brent', 'WTI', 'Henry Hub')
+            ORDER BY date
+        """).df()
+        df["period"] = pd.to_datetime(df["period"])
+        return df
+    except Exception as e:
+        st.warning(f"Failed to load price data: {e}")
+        return pd.DataFrame(columns=["period","value","benchmark"])
 
 @st.cache_data
-def load_map_data(db_path="data/energy.duckdb"):
-    conn = duckdb.connect(database=db_path, read_only=True)
-    df = conn.execute("""
-        SELECT country AS Country, iso3, SUM(production) AS Production
-        FROM goget
-        GROUP BY country, iso3
-    """).df()
-    return df
+def load_prod_cons(db_path=DB_PATH):
+    if not db_path.exists():
+        st.error(f"DuckDB file not found: {db_path}")
+        return pd.DataFrame(columns=["Year","Production","Consumption","Energy"])
+    conn = duckdb.connect(database=str(db_path), read_only=True)
+    dfs = []
 
-# Load data
+    # OIL
+    try:
+        oil_prod = conn.execute("SELECT Year, SUM(Production) AS Production FROM oil_prod GROUP BY Year").df()
+        oil_cons = conn.execute("SELECT Year, SUM(Consumption) AS Consumption FROM oil_cons GROUP BY Year").df()
+        oil = pd.merge(oil_prod, oil_cons, on="Year", how="outer").fillna(0)
+        oil["Energy"] = "Oil"
+        dfs.append(oil)
+    except Exception as e:
+        st.warning(f"Failed to load oil data: {e}")
+
+    # GAS
+    try:
+        gas_prod = conn.execute("""
+            SELECT production_year AS Year, SUM(production) AS Production
+            FROM goget
+            WHERE commodity='Gas'
+            GROUP BY production_year
+        """).df()
+        # Gas consumption may not exist; fill 0
+        gas_cons = pd.DataFrame({"Year": gas_prod["Year"], "Consumption": 0})
+        gas = pd.merge(gas_prod, gas_cons, on="Year", how="outer")
+        gas["Energy"] = "Gas"
+        dfs.append(gas)
+    except Exception as e:
+        st.warning(f"Failed to load gas data: {e}")
+
+    if dfs:
+        df = pd.concat(dfs, ignore_index=True).sort_values("Year")
+        return df
+    else:
+        return pd.DataFrame(columns=["Year","Production","Consumption","Energy"])
+
+@st.cache_data
+def load_map_data(db_path=DB_PATH):
+    if not db_path.exists():
+        st.error(f"DuckDB file not found: {db_path}")
+        return pd.DataFrame(columns=["Country","iso3","Production"])
+    conn = duckdb.connect(database=str(db_path), read_only=True)
+    try:
+        df = conn.execute("""
+            SELECT country AS Country, iso3, SUM(production) AS Production
+            FROM goget
+            GROUP BY country, iso3
+        """).df()
+        return df
+    except Exception as e:
+        st.warning(f"Failed to load map data: {e}")
+        return pd.DataFrame(columns=["Country","iso3","Production"])
+
+# =============================
+# LOAD DATA
+# =============================
 price_df = load_price_data()
 prod_cons_df = load_prod_cons()
 migas_map = load_map_data()
