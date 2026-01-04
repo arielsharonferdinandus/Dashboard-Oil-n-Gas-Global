@@ -43,14 +43,14 @@ def load_price_data(db_path=DB_PATH):
 def load_prod_cons(db_path=DB_PATH):
     if not db_path.exists():
         st.error(f"DuckDB file not found: {db_path}")
-        return pd.DataFrame(columns=["Year","Production","Consumption","Energy"])
+        return pd.DataFrame(columns=["Year","Production","Consumtion","Energy"])
     conn = duckdb.connect(database=str(db_path), read_only=True)
     dfs = []
 
     # OIL
     try:
         oil_prod = conn.execute("SELECT Year, SUM(Production) AS Production FROM oil_prod GROUP BY Year").df()
-        oil_cons = conn.execute("SELECT Year, SUM(Consumption) AS Consumption FROM oil_cons GROUP BY Year").df()
+        oil_cons = conn.execute("SELECT Year, SUM(Consumtion) AS Consumtion FROM oil_cons GROUP BY Year").df()
         oil = pd.merge(oil_prod, oil_cons, on="Year", how="outer").fillna(0)
         oil["Energy"] = "Oil"
         dfs.append(oil)
@@ -65,8 +65,7 @@ def load_prod_cons(db_path=DB_PATH):
             WHERE commodity='Gas'
             GROUP BY production_year
         """).df()
-        # Gas consumption may not exist; fill 0
-        gas_cons = pd.DataFrame({"Year": gas_prod["Year"], "Consumption": 0})
+        gas_cons = pd.DataFrame({"Year": gas_prod["Year"], "Consumtion": 0})
         gas = pd.merge(gas_prod, gas_cons, on="Year", how="outer")
         gas["Energy"] = "Gas"
         dfs.append(gas)
@@ -77,7 +76,7 @@ def load_prod_cons(db_path=DB_PATH):
         df = pd.concat(dfs, ignore_index=True).sort_values("Year")
         return df
     else:
-        return pd.DataFrame(columns=["Year","Production","Consumption","Energy"])
+        return pd.DataFrame(columns=["Year","Production","Consumtion","Energy"])
 
 @st.cache_data
 def load_map_data(db_path=DB_PATH):
