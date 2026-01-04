@@ -15,24 +15,17 @@ st.title("Global Energy Price – Detail View")
 st.caption("Based on International Energy Price Time Series (DuckDB)")
 
 # =============================
-# DUCKDB CONNECTION
-# =============================
-@st.cache_data
-def get_duckdb_connection(db_path="data/energy.duckdb"):
-    conn = duckdb.connect(database=db_path, read_only=True)
-    return conn
-
-conn = get_duckdb_connection()
-
-# =============================
 # LOAD DATA
 # =============================
 @st.cache_data
-def load_price_timeseries():
+def load_price_timeseries(db_path="data/energy.duckdb"):
+    # Open connection INSIDE the cached function
+    conn = duckdb.connect(database=db_path, read_only=True)
+    
     query = """
-    SELECT date AS period, price AS value, benchmark, product AS product_name, units
-    FROM price
-    ORDER BY date
+        SELECT date AS period, price AS value, benchmark, product AS product_name, units
+        FROM price
+        ORDER BY date
     """
     df = conn.execute(query).df()
     df["period"] = pd.to_datetime(df["period"])
@@ -91,6 +84,8 @@ if not filtered_df.empty:
         height=420
     )
     st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("No data available for the selected benchmark/product.")
 
 # =============================
 # LATEST SNAPSHOT
@@ -101,13 +96,7 @@ if not filtered_df.empty:
     latest = filtered_df.iloc[-1]
 
     snapshot = pd.DataFrame({
-        "Metric": [
-            "Date",
-            "Price",
-            "Units",
-            "Benchmark",
-            "Product"
-        ],
+        "Metric": ["Date", "Price", "Units", "Benchmark", "Product"],
         "Value": [
             latest["period"].date(),
             round(latest["value"], 2),
@@ -116,10 +105,7 @@ if not filtered_df.empty:
             latest["product_name"]
         ]
     })
-
     st.dataframe(snapshot, use_container_width=True, hide_index=True)
-else:
-    st.info("No data available for the selected benchmark/product.")
 
 # =============================
 # NEWS SECTION
@@ -127,24 +113,15 @@ else:
 st.subheader("Global Migas News & Analysis")
 
 news = [
-    {
-        "title": "OPEC+ Considers Production Cut",
-        "source": "Reuters",
-        "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
-        "image": "images/download.jpeg"
-    },
-    {
-        "title": "Middle East Tensions Push Oil Prices Higher",
-        "source": "Bloomberg",
-        "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
-        "image": "images/download (1).jpeg"
-    },
-    {
-        "title": "Global Energy Transition Impacts Oil Demand",
-        "source": "IEA",
-        "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
-        "image": "images/download (2).jpeg"
-    }
+    {"title": "OPEC+ Considers Production Cut", "source": "Reuters",
+     "summary": "OPEC+ members are discussing potential production cuts amid weakening global demand.",
+     "image": "images/download.jpeg"},
+    {"title": "Middle East Tensions Push Oil Prices Higher", "source": "Bloomberg",
+     "summary": "Escalating geopolitical risks in the Middle East have increased volatility in oil markets.",
+     "image": "images/download (1).jpeg"},
+    {"title": "Global Energy Transition Impacts Oil Demand", "source": "IEA",
+     "summary": "The shift towards renewable energy continues to reshape long-term oil demand outlook.",
+     "image": "images/download (2).jpeg"}
 ]
 
 for article in news:
