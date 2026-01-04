@@ -134,7 +134,7 @@ with col2:
     if "energy_type" not in st.session_state:
         st.session_state.energy_type = "Oil"
 
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, use_container_width=True)
     with c1:
         if st.button("Oil", type="primary" if st.session_state.energy_type=="Oil" else "secondary"):
             st.session_state.energy_type = "Oil"
@@ -167,7 +167,7 @@ with col3:
 st.subheader("Global Energy Production Map (DuckDB Data)")
 fig = px.choropleth(migas_map, locations="iso3", color="Production",
                     hover_name="Country", projection="natural earth",
-                    color_continuous_scale="YlOrRd", height=420)
+                    color_continuous_scale="YlOrRd", height=420, width=1200)
 st.plotly_chart(fig, use_container_width=True)
 
 if st.button("Map Detail..."):
