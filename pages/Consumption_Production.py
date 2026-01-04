@@ -18,7 +18,7 @@ st.caption("Country-Level Oil & Gas Data (DuckDB-based)")
 # LOAD DATA
 # =============================
 @st.cache_data
-def load_energy_data(db_path="data/energy.duckdb"):
+def load_energy_data(db_path="data/db/energy.duckdb"):
     # Open connection inside function (do NOT cache connection itself)
     conn = duckdb.connect(database=db_path, read_only=True)
 
