@@ -18,7 +18,7 @@ st.caption("Based on International Energy Price Time Series (DuckDB)")
 # LOAD DATA
 # =============================
 @st.cache_data
-def load_price_timeseries(db_path="data/energy.duckdb"):
+def load_price_timeseries(db_path="data/db/energy.duckdb"):
     # Open connection INSIDE the cached function
     conn = duckdb.connect(database=db_path, read_only=True)
     
