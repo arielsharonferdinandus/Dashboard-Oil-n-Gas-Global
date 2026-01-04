@@ -137,7 +137,7 @@ else:
     if not merged_df.dropna().empty:
         latest_row = merged_df.dropna().iloc[-1]
         snapshot = pd.DataFrame({
-            "Metric": ["Year", "Consumption", "Production", "Energy Type", "Country"],
+            "Metric": ["Year", "Consumtion", "Production", "Energy Type", "Country"],
             "Value": [
                 int(latest_row["Year"]),
                 round(latest_row["Consumtion"], 2),
