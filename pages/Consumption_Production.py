@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from pathlib import Path
+import duckdb
 
 # =============================
 # CONFIG
@@ -11,36 +11,65 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("⚡ Energy Consumption & Production – Detail View")
-st.caption("Country-Level Oil & Gas Data (Dataset-based)")
+st.title("Energy Consumption & Production – Detail View")
+st.caption("Country-Level Oil & Gas Data (DuckDB-based)")
 
-DATA_DIR = Path("data/csv")
+# =============================
+# DUCKDB CONNECTION
+# =============================
+@st.cache_data
+def get_duckdb_connection(db_path="data/energy.duckdb"):
+    conn = duckdb.connect(database=db_path, read_only=True)
+    return conn
+
+conn = get_duckdb_connection()
 
 # =============================
 # LOAD DATA
 # =============================
 @st.cache_data
 def load_energy_data():
-    # Consumption
-    cons_oil = pd.read_csv(DATA_DIR / "country_consumtion_oil.csv")
-    cons_gas = pd.read_csv(DATA_DIR / "country_consumtion_gas.csv")
-
+    # --- Consumption ---
+    cons_oil = conn.execute("""
+        SELECT Country, Year, Consumtion, iso3
+        FROM oil_cons
+    """).df()
     cons_oil["Type"] = "Oil"
-    cons_gas["Type"] = "Gas"
+
+    # If gas consumption table exists
+    tables = conn.execute("SHOW TABLES").df()['table_name'].tolist()
+    if 'gas_cons' in tables:
+        cons_gas = conn.execute("""
+            SELECT Country, Year, Consumtion, iso3
+            FROM gas_cons
+        """).df()
+        cons_gas["Type"] = "Gas"
+    else:
+        # If no gas consumption table, create empty
+        cons_gas = pd.DataFrame(columns=["Country","Year","Consumtion","iso3","Type"])
 
     cons = pd.concat([cons_oil, cons_gas], ignore_index=True)
 
-    # Production
-    prod_oil = pd.read_csv(DATA_DIR / "country_production_oil.csv")
-    prod_gas = pd.read_csv(DATA_DIR / "country_production_gas.csv")
-
+    # --- Production ---
+    prod_oil = conn.execute("""
+        SELECT Country, Year, Production, iso3
+        FROM oil_prod
+    """).df()
     prod_oil["Type"] = "Oil"
+
+    prod_gas = conn.execute("""
+        SELECT country AS Country,
+               production_year AS Year,
+               production AS Production,
+               iso3
+        FROM goget
+        WHERE commodity='Gas'
+    """).df()
     prod_gas["Type"] = "Gas"
 
     prod = pd.concat([prod_oil, prod_gas], ignore_index=True)
 
     return cons, prod
-
 
 cons_df, prod_df = load_energy_data()
 
@@ -117,26 +146,29 @@ if view_mode == "Yearly Trend":
 else:
     st.subheader(f"{selected_country} – Latest {selected_type} Snapshot")
 
-    latest_row = merged_df.dropna().iloc[-1]
+    if not merged_df.dropna().empty:
+        latest_row = merged_df.dropna().iloc[-1]
 
-    snapshot = pd.DataFrame({
-        "Metric": [
-            "Year",
-            "Consumption",
-            "Production",
-            "Energy Type",
-            "Country"
-        ],
-        "Value": [
-            int(latest_row["Year"]),
-            round(latest_row["Consumtion"], 2),
-            round(latest_row["Production"], 2),
-            selected_type,
-            selected_country
-        ]
-    })
+        snapshot = pd.DataFrame({
+            "Metric": [
+                "Year",
+                "Consumption",
+                "Production",
+                "Energy Type",
+                "Country"
+            ],
+            "Value": [
+                int(latest_row["Year"]),
+                round(latest_row["Consumtion"], 2),
+                round(latest_row["Production"], 2),
+                selected_type,
+                selected_country
+            ]
+        })
 
-    st.dataframe(snapshot, use_container_width=True, hide_index=True)
+        st.dataframe(snapshot, use_container_width=True, hide_index=True)
+    else:
+        st.info("No data available for the selected country/type.")
 
 # =============================
 # NEWS SECTION
@@ -166,15 +198,12 @@ news = [
 
 for article in news:
     col_img, col_text = st.columns([1, 4])
-
     with col_img:
         st.image(article["image"], width=150)
-
     with col_text:
         st.markdown(f"**{article['title']}**")
         st.caption(article["source"])
         st.write(article["summary"])
-
     st.markdown("---")
 
 # =============================
@@ -183,4 +212,4 @@ for article in news:
 if st.button("⬅ Back to Dashboard"):
     st.switch_page("app.py")
 
-st.caption("Energy Consumption & Production – Detail View")
+st.caption("Energy Consumption & Production – Detail View (DuckDB-based)")
