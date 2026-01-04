@@ -24,12 +24,11 @@ DB_PATH = Path("data/db/energy.duckdb")
 def load_energy_data(db_path=DB_PATH):
     if not db_path.exists():
         st.error(f"DuckDB file not found: {db_path}")
-        # return empty DataFrames
         return pd.DataFrame(), pd.DataFrame()
 
     conn = duckdb.connect(database=str(db_path), read_only=True)
 
-    # --- Check existing tables ---
+    # Check existing tables
     try:
         tables_df = conn.execute("SHOW TABLES").df()
         table_col = [c for c in tables_df.columns if c.lower() in ("name","table_name")][0]
@@ -38,67 +37,55 @@ def load_energy_data(db_path=DB_PATH):
         st.warning(f"Failed to list tables: {e}")
         tables = []
 
-    # --- Consumption ---
+    # --------------------------
+    # Consumption
+    # --------------------------
     cons_dfs = []
     if "oil_cons" in tables:
-        try:
-            cons_oil = conn.execute("""
-                SELECT Country, Year, Consumtion AS Consumption, iso3
-                FROM oil_cons
-            """).df()
-            cons_oil["Type"] = "Oil"
-            cons_dfs.append(cons_oil)
-        except Exception as e:
-            st.warning(f"Failed to load oil consumption: {e}")
-
+        df = conn.execute("SELECT Country, Year, Consumtion, iso3 FROM oil_cons").df()
+        df["Type"] = "Oil"
+        cons_dfs.append(df)
     if "gas_cons" in tables:
-        try:
-            cons_gas = conn.execute("""
-                SELECT Country, Year, Consumtion AS Consumption, iso3
-                FROM gas_cons
-            """).df()
-            cons_gas["Type"] = "Gas"
-            cons_dfs.append(cons_gas)
-        except Exception as e:
-            st.warning(f"Failed to load gas consumption: {e}")
+        df = conn.execute("SELECT Country, Year, Consumtion, iso3 FROM gas_cons").df()
+        df["Type"] = "Gas"
+        cons_dfs.append(df)
 
-    if cons_dfs:
-        cons = pd.concat(cons_dfs, ignore_index=True)
-    else:
-        cons = pd.DataFrame(columns=["Country","Year","Consumtion","iso3","Type"])
+    cons = pd.concat(cons_dfs, ignore_index=True) if cons_dfs else pd.DataFrame(
+        columns=["Country","Year","Consumtion","iso3","Type"]
+    )
 
-    # --- Production ---
+    # --------------------------
+    # Production
+    # --------------------------
     prod_dfs = []
     if "oil_prod" in tables:
-        try:
-            prod_oil = conn.execute("""
-                SELECT Country, Year, Production, iso3
-                FROM oil_prod
-            """).df()
-            prod_oil["Type"] = "Oil"
-            prod_dfs.append(prod_oil)
-        except Exception as e:
-            st.warning(f"Failed to load oil production: {e}")
+        df = conn.execute("SELECT Country, Year, Production, iso3 FROM oil_prod").df()
+        df["Type"] = "Oil"
+        prod_dfs.append(df)
+    if "gas_prod" in tables:
+        df = conn.execute("SELECT Country, Year, Production, iso3 FROM gas_prod").df()
+        df["Type"] = "Gas"
+        prod_dfs.append(df)
+    elif "goget" in tables:
+        df = conn.execute("""
+            SELECT country AS Country,
+                   production_year AS Year,
+                   production AS Production,
+                   iso3
+            FROM goget
+            WHERE commodity='Gas'
+        """).df()
+        df["Type"] = "Gas"
+        prod_dfs.append(df)
 
-    if "goget" in tables:
-        try:
-            prod_gas = conn.execute("""
-                SELECT country AS Country,
-                       production_year AS Year,
-                       production AS Production,
-                       iso3
-                FROM goget
-                WHERE commodity='Gas'
-            """).df()
-            prod_gas["Type"] = "Gas"
-            prod_dfs.append(prod_gas)
-        except Exception as e:
-            st.warning(f"Failed to load gas production: {e}")
+    prod = pd.concat(prod_dfs, ignore_index=True) if prod_dfs else pd.DataFrame(
+        columns=["Country","Year","Production","iso3","Type"]
+    )
 
-    if prod_dfs:
-        prod = pd.concat(prod_dfs, ignore_index=True)
-    else:
-        prod = pd.DataFrame(columns=["Country","Year","Production","iso3","Type"])
+    # Ensure Year numeric
+    for df in [cons, prod]:
+        if "Year" in df.columns:
+            df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
 
     return cons, prod
 
@@ -127,10 +114,7 @@ with col2:
     )
 
 with col3:
-    view_mode = st.selectbox(
-        "View Mode",
-        ["Yearly Trend", "Latest Snapshot"]
-    )
+    view_mode = st.selectbox("View Mode", ["Yearly Trend", "Latest Snapshot"])
 
 # =============================
 # FILTER DATA
