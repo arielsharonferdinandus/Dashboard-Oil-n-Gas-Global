@@ -231,7 +231,7 @@ with col2:
 with col3:
     st.subheader("Fuel Subsidy vs GDP")
     
-      fig = px.bar(
+    fig = px.bar(
         subsidy_gdp,
         x="Fuel Subsidy (% GDP)",
         y="Country",
