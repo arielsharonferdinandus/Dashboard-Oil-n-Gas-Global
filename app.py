@@ -15,13 +15,16 @@ st.markdown(
     """
     <style>
         .block-container {
-            padding-left: 0rem;
-            padding-right: 0rem;
+            padding-top: 1rem;
+            padding-bottom: 0rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
     </style>
     """,
     unsafe_allow_html=True
 )
+
 st.title("Global Energy Dashboard")
 st.caption("Oil, Gas & Energy Visualization – DuckDB-based Prototype")
 
