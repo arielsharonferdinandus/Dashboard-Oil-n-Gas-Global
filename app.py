@@ -160,16 +160,16 @@ migas_map = load_map_data()
 # =============================
 # DUMMY SUBSIDY vs GDP
 # =============================
-subsidy_gdp = pd.DataFrame({
-    "Country": ["Indonesia", "India", "China", "United States", "Saudi Arabia"],
-    "Fuel Subsidy (% GDP)": [2.1, 1.8, 0.9, 0.4, 3.2],
-    "GDP (Trillion USD)": [1.4, 3.4, 17.7, 26.9, 1.1]
-})
+# subsidy_gdp = pd.DataFrame({
+#     "Country": ["Indonesia", "India", "China", "United States", "Saudi Arabia"],
+#     "Fuel Subsidy (% GDP)": [2.1, 1.8, 0.9, 0.4, 3.2],
+#     "GDP (Trillion USD)": [1.4, 3.4, 17.7, 26.9, 1.1]
+# })
 
 # =============================
 # ROW 1 (3 COLUMNS)
 # =============================
-col1, col2, col3 = st.columns(3)
+col1, col2= st.columns(3)
 
 with col1:
     st.subheader("Global Oil Price Comparison")
@@ -228,23 +228,29 @@ with col2:
     if st.button("View more.."):
         st.switch_page("pages/Consumption_Production.py")
 
-with col3:
-    st.subheader("Fuel Subsidy vs GDP")
+# with col3:
+#     st.subheader("Fuel Subsidy vs GDP")
     
-    fig = px.bar(
-        subsidy_gdp,
-        x="Fuel Subsidy (% GDP)",
-        y="Country",
-        orientation="h",
-        height=260
-    )
+#     fig = px.bar(
+#         subsidy_gdp,
+#         x="Fuel Subsidy (% GDP)",
+#         y="Country",
+#         orientation="h",
+#         height=260
+#     )
     
-    st.plotly_chart(fig, use_container_width=True)
+#     st.plotly_chart(fig, use_container_width=True)
 
 # =============================
 # ROW 2 – MAP
 # =============================
 st.subheader("Global Energy Production Map")
+
+selected_country = st.selectbox(
+    "Focus on country (optional)",
+    ["All"] + sorted(migas_map["Country"].dropna().unique())
+)
+
 fig = px.choropleth(
     migas_map,
     locations="iso3",
@@ -254,6 +260,15 @@ fig = px.choropleth(
     color_continuous_scale="Blues",
     height=820
 )
+
+if selected_country != "All":
+    country_row = migas_map[migas_map["Country"] == selected_country]
+
+    if not country_row.empty:
+        fig.update_geos(
+            fitbounds="locations",
+            visible=True
+        )
 
 st.plotly_chart(fig, use_container_width=True)
 
