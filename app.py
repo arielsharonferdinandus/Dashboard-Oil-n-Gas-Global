@@ -169,7 +169,7 @@ migas_map = load_map_data()
 # =============================
 # ROW 1 (3 COLUMNS)
 # =============================
-col1, col2= st.columns(3)
+col1, col2= st.columns(2)
 
 with col1:
     st.subheader("Global Oil Price Comparison")
