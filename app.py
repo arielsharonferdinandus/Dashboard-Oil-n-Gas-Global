@@ -132,6 +132,23 @@ def load_map_data(db_path=DB_PATH):
     except Exception as e:
         st.warning(f"Failed to load map data: {e}")
         return pd.DataFrame(columns=["Country","iso3","Production"])
+        
+def filter_by_timespan(df, date_col, span):
+    if df.empty:
+        return df
+
+    max_date = df[date_col].max()
+
+    if span == "1Y":
+        cutoff = max_date - pd.DateOffset(years=1)
+    elif span == "3Y":
+        cutoff = max_date - pd.DateOffset(years=3)
+    elif span == "10Y":
+        cutoff = max_date - pd.DateOffset(years=10)
+    else:
+        return df
+
+    return df[df[date_col] >= cutoff]
 
 # =============================
 # LOAD DATA
@@ -156,7 +173,21 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     st.subheader("Global Oil Price Comparison")
-    fig = px.line(price_df, x="period", y="value", color="benchmark",
+
+    span_price = st.radio(
+        "Time span",
+        ["1Y", "3Y", "10Y"],
+        horizontal=True,
+        key="price_span"
+    )
+
+    price_filtered = filter_by_timespan(
+        price_df,
+        "period",
+        span_price
+    )
+    
+    fig = px.line(price_filtered, x="period", y="value", color="benchmark",
                   labels={"value": "USD / Barrel", "period": "Date", "benchmark": "Oil Type"},
                   height=260)
     fig.update_traces(opacity=0.45)
@@ -168,13 +199,19 @@ with col1:
 
 with col2:
     st.subheader("Global Production vs Consumption")
-
     energy_type = st.radio(
         "Energy Type",
         ["Oil", "Gas"],
         horizontal=True,
         key="energy_type"
     )
+
+    # span_energy = st.radio(
+    #     "Time span",
+    #     ["1Y", "3Y", "10Y"],
+    #     horizontal=True,
+    #     key="energy_span"
+    # )
 
     filtered_df = prod_cons_df[prod_cons_df["Energy"] == energy_type]
     
@@ -194,27 +231,12 @@ with col2:
 with col3:
     st.subheader("Fuel Subsidy vs GDP")
     
-    fig = px.scatter(
+      fig = px.bar(
         subsidy_gdp,
-        x="GDP (Trillion USD)",
-        y="Fuel Subsidy (% GDP)",
-        size="Fuel Subsidy (% GDP)",
-        hover_name="Country",
-        height=280,
-        labels={
-            "GDP (Trillion USD)": "GDP (Trillion USD)",
-            "Fuel Subsidy (% GDP)": "Fuel Subsidy (% of GDP)"
-        }
-    )
-    
-    fig.update_traces(
-        marker=dict(opacity=0.75, sizemode="area")
-    )
-    
-    fig.update_layout(
-        hovermode="closest",
-        xaxis=dict(tickformat=".0f"),
-        yaxis=dict(tickformat=".1f")
+        x="Fuel Subsidy (% GDP)",
+        y="Country",
+        orientation="h",
+        height=260
     )
     
     st.plotly_chart(fig, use_container_width=True)
