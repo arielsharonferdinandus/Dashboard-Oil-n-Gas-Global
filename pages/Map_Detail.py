@@ -10,6 +10,19 @@ st.set_page_config(
     page_title="Global Energy Production – Map Detail",
     layout="wide"
 )
+st.markdown(
+    """
+    <style>
+        .block-container {
+            padding-top: 1rem;
+            padding-bottom: 0rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 st.title("Global Energy Production – Map Detail")
 st.caption("Country-Level Production Data (DuckDB-based)")
@@ -51,19 +64,20 @@ map_df = load_map_data()
 # =============================
 st.subheader("Energy Production Explorer")
 
-col1, col2 = st.columns(2)
+with st.expander("Filters", expanded=True):
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        selected_type = st.selectbox(
+            "Energy Type",
+            sorted(map_df["Type"].unique())
+        )
 
-with col1:
-    selected_type = st.selectbox(
-        "Energy Type",
-        sorted(map_df["Type"].unique())
-    )
-
-with col2:
-    selected_year = st.selectbox(
-        "Year",
-        sorted(map_df["Year"].dropna().unique())
-    )
+    with col2:
+        selected_year = st.selectbox(
+            "Year",
+            sorted(map_df["Year"].dropna().unique())
+        )
 
 # =============================
 # FILTER DATA
@@ -80,14 +94,20 @@ st.subheader(f"Global {selected_type} Production – {selected_year}")
 
 if not filtered_df.empty:
     fig = px.choropleth(
-        filtered_df,
+    filtered_df,
         locations="iso3",
         color="Production",
         hover_name="Country",
         color_continuous_scale="YlOrRd",
-        projection="natural earth",
-        height=500
+        projection="natural earth"
     )
+
+    fig.update_layout(
+        height=750,            # increase vertical size
+        margin=dict(l=0, r=0, t=0, b=0),
+        coloraxis_colorbar=dict(title="Production")
+    )
+
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("No production data available for the selected type/year.")
