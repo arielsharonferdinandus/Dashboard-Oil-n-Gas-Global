@@ -193,8 +193,30 @@ with col2:
 
 with col3:
     st.subheader("Fuel Subsidy vs GDP")
-    fig = px.scatter(subsidy_gdp, x="GDP (Trillion USD)", y="Fuel Subsidy (% GDP)",
-                     size="Fuel Subsidy (% GDP)", hover_name="Country", height=260)
+    
+    fig = px.scatter(
+        subsidy_gdp,
+        x="GDP (Trillion USD)",
+        y="Fuel Subsidy (% GDP)",
+        size="Fuel Subsidy (% GDP)",
+        hover_name="Country",
+        height=280,
+        labels={
+            "GDP (Trillion USD)": "GDP (Trillion USD)",
+            "Fuel Subsidy (% GDP)": "Fuel Subsidy (% of GDP)"
+        }
+    )
+    
+    fig.update_traces(
+        marker=dict(opacity=0.75, sizemode="area")
+    )
+    
+    fig.update_layout(
+        hovermode="closest",
+        xaxis=dict(tickformat=".0f"),
+        yaxis=dict(tickformat=".1f")
+    )
+    
     st.plotly_chart(fig, use_container_width=True)
 
 # =============================
