@@ -251,13 +251,6 @@ selected_country = st.selectbox(
     ["All"] + sorted(migas_map["Country"].dropna().unique())
 )
 
-st.subheader("Global Energy Production Map")
-
-selected_country = st.selectbox(
-    "Focus on country (optional)",
-    ["All"] + sorted(migas_map["Country"].dropna().unique())
-)
-
 # 👉 Filter data first
 if selected_country != "All":
     map_df = migas_map[migas_map["Country"] == selected_country]
