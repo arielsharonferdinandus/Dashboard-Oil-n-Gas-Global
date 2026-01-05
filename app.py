@@ -74,11 +74,15 @@ def load_prod_cons(db_path=DB_PATH):
     try:
         gas_prod = conn.execute("""
             SELECT production_year AS Year, SUM(production) AS Production
-            FROM goget
+            FROM gas_prod
             WHERE commodity='Gas'
             GROUP BY production_year
         """).df()
-        gas_cons = pd.DataFrame({"Year": gas_prod["Year"], "Consumtion": 0})
+        gas_cons = conn.execute("""
+            SELECT Year, SUM(Consumtion) AS Consumtion
+            FROM gas_cons
+            GROUP BY Year
+        """).df()
         gas = pd.merge(gas_prod, gas_cons, on="Year", how="outer")
         gas["Energy"] = "Gas"
         dfs.append(gas)
