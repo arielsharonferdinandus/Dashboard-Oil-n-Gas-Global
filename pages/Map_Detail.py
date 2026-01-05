@@ -93,17 +93,14 @@ filtered_df = map_df[
 st.subheader(f"Global {selected_type} Production – {selected_year}")
 
 if not filtered_df.empty:
-    fig = px.choropleth(
-    filtered_df,
-        locations="iso3",
-        color="Production",
-        hover_name="Country",
-        color_continuous_scale="YlOrRd",
-        projection="natural earth"
+    fig = px.scatter_geo(
+        filtered_df,
+        size="Production",
+        projection="robinson"
     )
 
     fig.update_layout(
-        height=750,            # increase vertical size
+        height=940,            # increase vertical size
         margin=dict(l=0, r=0, t=0, b=0),
         coloraxis_colorbar=dict(title="Production")
     )
