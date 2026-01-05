@@ -189,7 +189,7 @@ fig = px.choropleth(
     hover_name="Country",
     projection="robinson",
     color_continuous_scale="Blues",
-    height=520
+    height=820
 )
 
 st.plotly_chart(fig, use_container_width=True)
