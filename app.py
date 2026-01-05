@@ -73,7 +73,7 @@ def load_prod_cons(db_path=DB_PATH):
     # GAS
     try:
         gas_prod = conn.execute("""
-            SELECT production_year AS Year, SUM(production) AS Production
+            SELECT Year AS Year, SUM(production) AS Production
             FROM gas_prod
             WHERE commodity='Gas'
             GROUP BY Year
