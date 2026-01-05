@@ -100,13 +100,11 @@ def load_prod_cons(db_path=DB_PATH):
         else:
             gas_cons = pd.DataFrame(columns=["Year", "Consumtion"])
 
-    gas = pd.merge(gas_prod, gas_cons, on="Year", how="outer").fillna(0)
-    gas["Energy"] = "Gas"
-    dfs.append(gas)
-
-except Exception as e:
-    st.warning(f"Failed to load gas data: {e}")
-
+        gas = pd.merge(gas_prod, gas_cons, on="Year", how="outer").fillna(0)
+        gas["Energy"] = "Gas"
+        dfs.append(gas)
+    except Exception as e:
+        st.warning(f"Failed to load gas data: {e}")
 
     if dfs:
         df = pd.concat(dfs, ignore_index=True).sort_values("Year")
