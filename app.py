@@ -76,7 +76,7 @@ def load_prod_cons(db_path=DB_PATH):
             SELECT production_year AS Year, SUM(production) AS Production
             FROM gas_prod
             WHERE commodity='Gas'
-            GROUP BY production_year
+            GROUP BY Year
         """).df()
         gas_cons = conn.execute("""
             SELECT Year, SUM(Consumtion) AS Consumtion
