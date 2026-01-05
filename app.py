@@ -251,8 +251,21 @@ selected_country = st.selectbox(
     ["All"] + sorted(migas_map["Country"].dropna().unique())
 )
 
+st.subheader("Global Energy Production Map")
+
+selected_country = st.selectbox(
+    "Focus on country (optional)",
+    ["All"] + sorted(migas_map["Country"].dropna().unique())
+)
+
+# 👉 Filter data first
+if selected_country != "All":
+    map_df = migas_map[migas_map["Country"] == selected_country]
+else:
+    map_df = migas_map
+
 fig = px.choropleth(
-    migas_map,
+    map_df,
     locations="iso3",
     color="Production",
     hover_name="Country",
@@ -261,19 +274,18 @@ fig = px.choropleth(
     height=820
 )
 
+# 👉 NOW fitbounds works
 if selected_country != "All":
-    country_row = migas_map[migas_map["Country"] == selected_country]
-
-    if not country_row.empty:
-        fig.update_geos(
-            fitbounds="locations",
-            visible=True
-        )
+    fig.update_geos(
+        fitbounds="locations",
+        visible=True
+    )
 
 st.plotly_chart(fig, use_container_width=True)
 
 if st.button("Map Detail..."):
     st.switch_page("pages/Map_Detail.py")
+
 
 # =============================
 # NEWS SECTION
