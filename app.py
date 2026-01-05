@@ -72,22 +72,41 @@ def load_prod_cons(db_path=DB_PATH):
 
     # GAS
     try:
-        gas_prod = conn.execute("""
-            SELECT Year AS Year, SUM(production) AS Production
-            FROM gas_prod
-            WHERE commodity='Gas'
-            GROUP BY Year
-        """).df()
-        gas_cons = conn.execute("""
-            SELECT Year, SUM(Consumtion) AS Consumtion
-            FROM gas_cons
-            GROUP BY Year
-        """).df()
-        gas = pd.merge(gas_prod, gas_cons, on="Year", how="outer")
-        gas["Energy"] = "Gas"
-        dfs.append(gas)
-    except Exception as e:
-        st.warning(f"Failed to load gas data: {e}")
+        # --- Production ---
+        if "gas_prod" in tables:
+            gas_prod = conn.execute("""
+                SELECT Year, SUM(Production) AS Production
+                FROM gas_prod
+                GROUP BY Year
+            """).df()
+        elif "goget" in tables:
+            gas_prod = conn.execute("""
+                SELECT production_year AS Year,
+                       SUM(production) AS Production
+                FROM goget
+                WHERE commodity = 'Gas'
+                GROUP BY production_year
+            """).df()
+        else:
+            gas_prod = pd.DataFrame(columns=["Year", "Production"])
+    
+        # --- Consumption ---
+        if "gas_cons" in tables:
+            gas_cons = conn.execute("""
+                SELECT Year, SUM(Consumtion) AS Consumtion
+                FROM gas_cons
+                GROUP BY Year
+            """).df()
+        else:
+            gas_cons = pd.DataFrame(columns=["Year", "Consumtion"])
+
+    gas = pd.merge(gas_prod, gas_cons, on="Year", how="outer").fillna(0)
+    gas["Energy"] = "Gas"
+    dfs.append(gas)
+
+except Exception as e:
+    st.warning(f"Failed to load gas data: {e}")
+
 
     if dfs:
         df = pd.concat(dfs, ignore_index=True).sort_values("Year")
