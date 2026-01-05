@@ -60,6 +60,10 @@ def load_prod_cons(db_path=DB_PATH):
     conn = duckdb.connect(database=str(db_path), read_only=True)
     dfs = []
 
+    tables_df = conn.execute("SHOW TABLES").df()
+    table_col = [c for c in tables_df.columns if c.lower() in ("name","table_name")][0]
+    tables = tables_df[table_col].tolist()
+
     # OIL
     try:
         oil_prod = conn.execute("SELECT Year, SUM(Production) AS Production FROM oil_prod GROUP BY Year").df()
@@ -165,26 +169,24 @@ with col1:
 with col2:
     st.subheader("Global Production vs Consumption")
 
-    if "energy_type" not in st.session_state:
-        st.session_state.energy_type = "Oil"
+    energy_type = st.radio(
+        "Energy Type",
+        ["Oil", "Gas"],
+        horizontal=True,
+        key="energy_type"
+    )
 
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("Oil", type="primary" if st.session_state.energy_type=="Oil" else "secondary"):
-            st.session_state.energy_type = "Oil"
-    with c2:
-        if st.button("Gas", type="primary" if st.session_state.energy_type=="Gas" else "secondary"):
-            st.session_state.energy_type = "Gas"
-
-    energy_type = st.session_state.energy_type
-    st.caption(f"Selected energy type: **{energy_type}**")
-
-    filtered_df = prod_cons_df[prod_cons_df["Energy"]==energy_type]
-    fig = px.line(filtered_df, x="Year", y=["Production","Consumtion"],
-                  labels={"value":"Volume","variable":"Metric"}, height=260)
-    fig.update_traces(opacity=0.45)
-    fig.update_layout(legend_title_text="Click to focus / hide", hovermode="x unified")
+    filtered_df = prod_cons_df[prod_cons_df["Energy"] == energy_type]
+    
+    fig = px.line(
+        filtered_df,
+        x="Year",
+        y=["Production", "Consumtion"],
+        labels={"value": "Volume", "variable": "Metric"},
+        height=260
+    )
     st.plotly_chart(fig, use_container_width=True)
+
 
     if st.button("View more.."):
         st.switch_page("pages/Consumption_Production.py")
