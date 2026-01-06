@@ -8,7 +8,7 @@ from pathlib import Path
 # CONFIG
 # =============================
 st.set_page_config(
-    page_title="Global Energy Production – Map Detail",
+    page_title="Global Oil Production – Map Detail",
     layout="wide"
 )
 
@@ -26,19 +26,18 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("Global Energy Production – Map Detail")
-st.caption("Country-Level Oil & Gas – Production & Consumption")
+st.title("Global Oil Production – Map Detail")
+st.caption("Country-Level Oil Production & Consumption")
 
 DB_PATH = Path("data/db/energy.duckdb")
 
 # =============================
-# LOAD DATA (MATCH app.py LOGIC)
+# LOAD DATA (OIL ONLY)
 # =============================
 @st.cache_data
-def load_map_detail(db_path=DB_PATH):
+def load_oil_data(db_path=DB_PATH):
     conn = duckdb.connect(database=str(db_path), read_only=True)
 
-    # ---------- OIL ----------
     oil_prod = conn.execute("""
         SELECT Country, iso3, Year, Production
         FROM oil_prod
@@ -50,71 +49,51 @@ def load_map_detail(db_path=DB_PATH):
     """).df()
 
     oil = pd.merge(
-        oil_prod, oil_cons,
+        oil_prod,
+        oil_cons,
         on=["Country", "iso3", "Year"],
         how="left"
     )
-    oil["Energy"] = "Oil"
 
-    # ---------- GAS (IMPORTANT FIX) ----------
-    gas_prod = conn.execute("""
-        SELECT country AS Country,
-               iso3,
-               production_year AS Year,
-               production AS Production
-        FROM goget
-        WHERE commodity = 'Gas'
-    """).df()
-
-    gas_cons = conn.execute("""
-        SELECT country AS Country,
-               iso3,
-               Year,
-               Consumtion
-        FROM gas_cons
-    """).df()
-
-    gas = pd.merge(
-        gas_prod, gas_cons,
-        on=["Country", "iso3", "Year"],
-        how="left"
-    )
-    gas["Energy"] = "Gas"
-
-    df = pd.concat([oil, gas], ignore_index=True)
-    df["Consumtion"] = df["Consumtion"].fillna(0)
-
-    return df
+    oil["Consumtion"] = oil["Consumtion"].fillna(0)
+    return oil
 
 
-df = load_map_detail()
+df = load_oil_data()
+
+# =============================
+# YEAR DEFAULT = 2023
+# =============================
+available_years = sorted(df["Year"].dropna().unique())
+default_year = 2023 if 2023 in available_years else max(available_years)
 
 # =============================
 # MAP FILTERS
 # =============================
 st.subheader("Map Filters")
 
-c1, c2, c3 = st.columns(3)
+c1, c2 = st.columns(2)
 
 with c1:
-    energy_type = st.selectbox("Energy Type", ["Oil", "Gas"])
-
-with c2:
     year = st.selectbox(
         "Year",
-        sorted(df[df["Energy"] == energy_type]["Year"].dropna().unique())
+        available_years,
+        index=available_years.index(default_year)
     )
 
-with c3:
+with c2:
     country = st.selectbox(
         "Focus Country",
         ["All"] + sorted(df["Country"].dropna().unique())
     )
 
-map_df = df[
-    (df["Energy"] == energy_type) &
-    (df["Year"] == year)
-]
+metric = st.radio(
+    "Metric",
+    ["Production", "Consumtion"],
+    horizontal=True
+)
+
+map_df = df[df["Year"] == year]
 
 if country != "All":
     map_df = map_df[map_df["Country"] == country]
@@ -122,17 +101,17 @@ if country != "All":
 # =============================
 # MAP
 # =============================
-st.subheader(f"{energy_type} Production Map – {year}")
+st.subheader(f"Oil {metric} Map – {year}")
 
 fig = px.choropleth(
     map_df,
     locations="iso3",
     locationmode="ISO-3",
-    color="Production",
+    color=metric,
     hover_name="Country",
     projection="robinson",
     color_continuous_scale="Blues",
-    height=880
+    height=860
 )
 
 if country != "All":
@@ -142,74 +121,57 @@ fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
 st.plotly_chart(fig, use_container_width=True)
 
 # =============================
-# TOP 10 COUNTRIES (RESTORED)
-# =============================
-st.subheader(f"Top 10 {energy_type} Producing Countries – {year}")
-
-top10 = (
-    df[(df["Energy"] == energy_type) & (df["Year"] == year)]
-    .groupby(["Country", "iso3"], as_index=False)["Production"]
-    .sum()
-    .sort_values("Production", ascending=False)
-    .head(10)
-)
-
-st.dataframe(top10, use_container_width=True)
-
-# =============================
 # COUNTRY DETAIL (LATEST DATA)
 # =============================
-st.subheader("Country Detailed Information (Latest Available Data)")
+st.subheader("Country Detail – Latest Available Data")
 
 if country != "All":
     country_df = df[df["Country"] == country]
 
     if not country_df.empty:
-        # Latest per energy
         latest = (
             country_df
             .sort_values("Year")
-            .groupby("Energy")
-            .tail(1)
+            .iloc[-1]
         )
 
-        st.markdown("### Country Metadata")
-        meta = latest[["Country", "iso3", "Energy", "Year"]]
-        st.dataframe(meta, use_container_width=True)
+        detail = pd.DataFrame({
+            "Field": [
+                "Country",
+                "ISO3 Code",
+                "Latest Year",
+                "Oil Production",
+                "Oil Consumption"
+            ],
+            "Value": [
+                latest["Country"],
+                latest["iso3"],
+                int(latest["Year"]),
+                round(latest["Production"], 2),
+                round(latest["Consumtion"], 2)
+            ]
+        })
 
-        st.markdown("### Latest Production & Consumption")
-
-        summary = latest[[
-            "Energy", "Year", "Production", "Consumtion"
-        ]]
-
-        st.dataframe(summary, use_container_width=True)
-
-        # ---------- BAR COMPARISON ----------
-        col1, col2 = st.columns(2)
-
-        for energy, col in zip(["Oil", "Gas"], [col1, col2]):
-            with col:
-                e_df = summary[summary["Energy"] == energy]
-                if not e_df.empty:
-                    fig_bar = px.bar(
-                        e_df.melt(
-                            id_vars=["Energy", "Year"],
-                            value_vars=["Production", "Consumtion"],
-                            var_name="Metric",
-                            value_name="Value"
-                        ),
-                        x="Metric",
-                        y="Value",
-                        color="Metric",
-                        title=f"{energy} – Latest Production vs Consumption",
-                        height=360
-                    )
-                    st.plotly_chart(fig_bar, use_container_width=True)
-                else:
-                    st.info(f"No {energy} data available.")
+        st.dataframe(detail, use_container_width=True, hide_index=True)
+    else:
+        st.info("No data available for this country.")
 else:
     st.info("Select a country to view detailed information.")
+
+# =============================
+# TOP 10 COUNTRIES
+# =============================
+st.subheader(f"Top 10 Oil {metric} Countries – {year}")
+
+top10 = (
+    df[df["Year"] == year]
+    .groupby(["Country", "iso3"], as_index=False)[metric]
+    .sum()
+    .sort_values(metric, ascending=False)
+    .head(10)
+)
+
+st.dataframe(top10, use_container_width=True)
 
 # =============================
 # BACK
@@ -217,4 +179,4 @@ else:
 if st.button("⬅ Back to Dashboard"):
     st.switch_page("app.py")
 
-st.caption("Global Energy Production – Map Detail")
+st.caption("Global Oil Production – Map Detail")
