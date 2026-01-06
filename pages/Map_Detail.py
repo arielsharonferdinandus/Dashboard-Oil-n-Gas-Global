@@ -62,7 +62,7 @@ def load_oil_data(db_path=DB_PATH):
 df = load_oil_data()
 
 # =============================
-# YEAR DEFAULT = 2023
+# DEFAULT YEAR = 2023
 # =============================
 available_years = sorted(df["Year"].dropna().unique())
 default_year = 2023 if 2023 in available_years else max(available_years)
@@ -87,27 +87,21 @@ with c2:
         ["All"] + sorted(df["Country"].dropna().unique())
     )
 
-metric = st.radio(
-    "Metric",
-    ["Production", "Consumtion"],
-    horizontal=True
-)
-
 map_df = df[df["Year"] == year]
 
 if country != "All":
     map_df = map_df[map_df["Country"] == country]
 
 # =============================
-# MAP
+# MAP (PRODUCTION ONLY)
 # =============================
-st.subheader(f"Oil {metric} Map – {year}")
+st.subheader(f"Oil Production Map – {year}")
 
 fig = px.choropleth(
     map_df,
     locations="iso3",
     locationmode="ISO-3",
-    color=metric,
+    color="Production",
     hover_name="Country",
     projection="robinson",
     color_continuous_scale="Blues",
@@ -121,53 +115,71 @@ fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
 st.plotly_chart(fig, use_container_width=True)
 
 # =============================
-# COUNTRY DETAIL (LATEST DATA)
+# COUNTRY DETAIL (2023 DEFAULT)
 # =============================
-st.subheader("Country Detail – Latest Available Data")
+st.subheader("Country Detail – Production vs Consumption")
 
 if country != "All":
     country_df = df[df["Country"] == country]
 
-    if not country_df.empty:
-        latest = (
-            country_df
-            .sort_values("Year")
-            .iloc[-1]
-        )
-
-        detail = pd.DataFrame({
-            "Field": [
-                "Country",
-                "ISO3 Code",
-                "Latest Year",
-                "Oil Production",
-                "Oil Consumption"
-            ],
-            "Value": [
-                latest["Country"],
-                latest["iso3"],
-                int(latest["Year"]),
-                round(latest["Production"], 2),
-                round(latest["Consumtion"], 2)
-            ]
-        })
-
-        st.dataframe(detail, use_container_width=True, hide_index=True)
+    # pick 2023 or fallback to latest
+    if year not in country_df["Year"].values:
+        detail_row = country_df.sort_values("Year").iloc[-1]
     else:
-        st.info("No data available for this country.")
+        detail_row = country_df[country_df["Year"] == year].iloc[0]
+
+    # ---- DETAIL TABLE ----
+    detail_table = pd.DataFrame({
+        "Field": [
+            "Country",
+            "ISO3 Code",
+            "Year",
+            "Oil Production",
+            "Oil Consumption"
+        ],
+        "Value": [
+            detail_row["Country"],
+            detail_row["iso3"],
+            int(detail_row["Year"]),
+            round(detail_row["Production"], 2),
+            round(detail_row["Consumtion"], 2)
+        ]
+    })
+
+    st.dataframe(detail_table, use_container_width=True, hide_index=True)
+
+    # ---- PIE CHART ----
+    pie_df = pd.DataFrame({
+        "Metric": ["Production", "Consumption"],
+        "Value": [
+            detail_row["Production"],
+            detail_row["Consumtion"]
+        ]
+    })
+
+    fig_pie = px.pie(
+        pie_df,
+        names="Metric",
+        values="Value",
+        title=f"{country} – Oil Production vs Consumption ({int(detail_row['Year'])})",
+        height=420
+    )
+
+    st.plotly_chart(fig_pie, use_container_width=True)
+
 else:
     st.info("Select a country to view detailed information.")
 
 # =============================
 # TOP 10 COUNTRIES
 # =============================
-st.subheader(f"Top 10 Oil {metric} Countries – {year}")
+st.subheader(f"Top 10 Oil Producing Countries – {year}")
 
 top10 = (
     df[df["Year"] == year]
-    .groupby(["Country", "iso3"], as_index=False)[metric]
+    .groupby(["Country", "iso3"], as_index=False)["Production"]
     .sum()
-    .sort_values(metric, ascending=False)
+    .sort_values("Production", ascending=False)
     .head(10)
 )
 
