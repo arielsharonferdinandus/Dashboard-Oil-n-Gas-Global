@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import duckdb
+from pathlib import Path
 
 # =============================
 # CONFIG
@@ -10,6 +11,7 @@ st.set_page_config(
     page_title="Global Energy Production – Map Detail",
     layout="wide"
 )
+
 st.markdown(
     """
     <style>
@@ -25,103 +27,175 @@ st.markdown(
 )
 
 st.title("Global Energy Production – Map Detail")
-st.caption("Country-Level Production Data (DuckDB-based)")
+st.caption("Country-Level Production & Consumption (DuckDB-based)")
+
+DB_PATH = Path("data/db/energy.duckdb")
 
 # =============================
 # LOAD DATA
 # =============================
 @st.cache_data
-def load_map_data(db_path="data/db/energy.duckdb"):
-    # Open connection INSIDE the cached function
-    conn = duckdb.connect(database=db_path, read_only=True)
-    
-    # Oil production
+def load_map_detail(db_path=DB_PATH):
+    conn = duckdb.connect(database=str(db_path), read_only=True)
+
+    # ---- OIL ----
     oil_prod = conn.execute("""
         SELECT Country, iso3, Year, Production
         FROM oil_prod
     """).df()
-    oil_prod["Type"] = "Oil"
+    oil_cons = conn.execute("""
+        SELECT Country, iso3, Year, Consumtion
+        FROM oil_cons
+    """).df()
 
-    # Gas production from goget
+    oil = pd.merge(
+        oil_prod, oil_cons,
+        on=["Country", "iso3", "Year"],
+        how="left"
+    )
+    oil["Type"] = "Oil"
+
+    # ---- GAS ----
     gas_prod = conn.execute("""
         SELECT country AS Country,
                iso3,
                production_year AS Year,
                production AS Production
         FROM goget
-        WHERE commodity='Gas'
+        WHERE commodity = 'Gas'
     """).df()
-    gas_prod["Type"] = "Gas"
 
-    # Combine oil and gas
-    df = pd.concat([oil_prod, gas_prod], ignore_index=True)
+    gas_cons = conn.execute("""
+        SELECT country AS Country,
+               iso3,
+               Year,
+               Consumtion
+        FROM gas_cons
+    """).df()
+
+    gas = pd.merge(
+        gas_prod, gas_cons,
+        on=["Country", "iso3", "Year"],
+        how="left"
+    )
+    gas["Type"] = "Gas"
+
+    df = pd.concat([oil, gas], ignore_index=True)
+    df["Consumtion"] = df["Consumtion"].fillna(0)
+
     return df
 
-map_df = load_map_data()
+
+df = load_map_detail()
 
 # =============================
-# SELECTORS
+# FILTERS
 # =============================
-st.subheader("Energy Production Explorer")
+st.subheader("Filters")
 
-with st.expander("Filters", expanded=True):
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        selected_type = st.selectbox(
+with st.expander("Map Filters", expanded=True):
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        energy_type = st.selectbox(
             "Energy Type",
-            sorted(map_df["Type"].unique())
+            sorted(df["Type"].unique())
         )
 
-    with col2:
-        selected_year = st.selectbox(
+    with c2:
+        year = st.selectbox(
             "Year",
-            sorted(map_df["Year"].dropna().unique())
+            sorted(df["Year"].dropna().unique())
         )
 
-# =============================
-# FILTER DATA
-# =============================
-filtered_df = map_df[
-    (map_df["Type"] == selected_type) &
-    (map_df["Year"] == selected_year)
+    with c3:
+        country = st.selectbox(
+            "Focus Country (optional)",
+            ["All"] + sorted(df["Country"].dropna().unique())
+        )
+
+filtered_df = df[
+    (df["Type"] == energy_type) &
+    (df["Year"] == year)
 ]
 
 # =============================
-# CHOROPLETH MAP
+# MAP
 # =============================
-st.subheader(f"Global {selected_type} Production – {selected_year}")
+st.subheader(f"{energy_type} Production Map – {year}")
 
-if not filtered_df.empty:
-    fig = px.scatter_geo(
-        filtered_df,
-        size="Production",
-        projection="robinson"
+if country != "All":
+    map_df = filtered_df[filtered_df["Country"] == country]
+else:
+    map_df = filtered_df
+
+if not map_df.empty:
+    fig = px.choropleth(
+        map_df,
+        locations="iso3",
+        locationmode="ISO-3",
+        color="Production",
+        hover_name="Country",
+        projection="robinson",
+        color_continuous_scale="Blues",
+        height=940
     )
 
+    if country != "All":
+        fig.update_geos(
+            fitbounds="locations",
+            visible=True
+        )
+
     fig.update_layout(
-        height=940,            # increase vertical size
         margin=dict(l=0, r=0, t=0, b=0),
         coloraxis_colorbar=dict(title="Production")
     )
 
     st.plotly_chart(fig, use_container_width=True)
 else:
-    st.info("No production data available for the selected type/year.")
+    st.info("No data available for the selected filters.")
 
 # =============================
-# TOP COUNTRIES TABLE
+# COUNTRY DETAIL
 # =============================
-st.subheader(f"Top Production Countries – {selected_type} {selected_year}")
+st.subheader("Country Detail")
 
-if not filtered_df.empty:
-    top_countries = filtered_df.sort_values("Production", ascending=False).head(10)
-    st.dataframe(
-        top_countries[["Country", "Production", "iso3"]],
-        use_container_width=True
+if country != "All" and not map_df.empty:
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.metric(
+            "Production",
+            f"{map_df['Production'].sum():,.0f}"
+        )
+
+    with c2:
+        st.metric(
+            "Consumption",
+            f"{map_df['Consumtion'].sum():,.0f}"
+        )
+
+    st.line_chart(
+        map_df.sort_values("Year").set_index("Year")[["Production", "Consumtion"]]
     )
 else:
-    st.info("No data available to display top countries.")
+    st.info("Select a country to see detailed production & consumption trends.")
+
+# =============================
+# TOP COUNTRIES
+# =============================
+st.subheader("Top Producing Countries")
+
+top = (
+    filtered_df
+    .groupby("Country", as_index=False)["Production"]
+    .sum()
+    .sort_values("Production", ascending=False)
+    .head(10)
+)
+
+st.dataframe(top, use_container_width=True)
 
 # =============================
 # BACK BUTTON
