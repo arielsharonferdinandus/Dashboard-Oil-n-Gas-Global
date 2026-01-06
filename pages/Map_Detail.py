@@ -27,7 +27,7 @@ st.markdown(
 )
 
 st.title("Global Energy Production – Map Detail")
-st.caption("Country-Level Production & Consumption (DuckDB-based)")
+st.caption("Country-Level Oil & Gas Production and Consumption")
 
 DB_PATH = Path("data/db/energy.duckdb")
 
@@ -43,6 +43,7 @@ def load_map_detail(db_path=DB_PATH):
         SELECT Country, iso3, Year, Production
         FROM oil_prod
     """).df()
+
     oil_cons = conn.execute("""
         SELECT Country, iso3, Year, Consumtion
         FROM oil_cons
@@ -53,7 +54,7 @@ def load_map_detail(db_path=DB_PATH):
         on=["Country", "iso3", "Year"],
         how="left"
     )
-    oil["Type"] = "Oil"
+    oil["Energy"] = "Oil"
 
     # ---- GAS ----
     gas_prod = conn.execute("""
@@ -78,7 +79,7 @@ def load_map_detail(db_path=DB_PATH):
         on=["Country", "iso3", "Year"],
         how="left"
     )
-    gas["Type"] = "Gas"
+    gas["Energy"] = "Gas"
 
     df = pd.concat([oil, gas], ignore_index=True)
     df["Consumtion"] = df["Consumtion"].fillna(0)
@@ -89,45 +90,42 @@ def load_map_detail(db_path=DB_PATH):
 df = load_map_detail()
 
 # =============================
-# FILTERS
+# FILTERS (MAP ONLY)
 # =============================
-st.subheader("Filters")
+st.subheader("Map Filters")
 
-with st.expander("Map Filters", expanded=True):
-    c1, c2, c3 = st.columns(3)
+c1, c2, c3 = st.columns(3)
 
-    with c1:
-        energy_type = st.selectbox(
-            "Energy Type",
-            sorted(df["Type"].unique())
-        )
+with c1:
+    energy_type = st.selectbox(
+        "Energy Type (Map)",
+        ["Oil", "Gas"]
+    )
 
-    with c2:
-        year = st.selectbox(
-            "Year",
-            sorted(df["Year"].dropna().unique())
-        )
+with c2:
+    year = st.selectbox(
+        "Year",
+        sorted(df["Year"].dropna().unique())
+    )
 
-    with c3:
-        country = st.selectbox(
-            "Focus Country (optional)",
-            ["All"] + sorted(df["Country"].dropna().unique())
-        )
+with c3:
+    country = st.selectbox(
+        "Focus Country (optional)",
+        ["All"] + sorted(df["Country"].dropna().unique())
+    )
 
-filtered_df = df[
-    (df["Type"] == energy_type) &
+map_df = df[
+    (df["Energy"] == energy_type) &
     (df["Year"] == year)
 ]
+
+if country != "All":
+    map_df = map_df[map_df["Country"] == country]
 
 # =============================
 # MAP
 # =============================
 st.subheader(f"{energy_type} Production Map – {year}")
-
-if country != "All":
-    map_df = filtered_df[filtered_df["Country"] == country]
-else:
-    map_df = filtered_df
 
 if not map_df.empty:
     fig = px.choropleth(
@@ -138,69 +136,70 @@ if not map_df.empty:
         hover_name="Country",
         projection="robinson",
         color_continuous_scale="Blues",
-        height=940
+        height=900
     )
 
     if country != "All":
-        fig.update_geos(
-            fitbounds="locations",
-            visible=True
-        )
+        fig.update_geos(fitbounds="locations", visible=True)
 
-    fig.update_layout(
-        margin=dict(l=0, r=0, t=0, b=0),
-        coloraxis_colorbar=dict(title="Production")
-    )
-
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     st.plotly_chart(fig, use_container_width=True)
 else:
-    st.info("No data available for the selected filters.")
+    st.info("No data available for selected filters.")
 
 # =============================
-# COUNTRY DETAIL
+# COUNTRY DETAIL (OIL + GAS)
 # =============================
-st.subheader("Country Detail")
+st.subheader("Country Detail – Oil & Gas")
 
-if country != "All" and not map_df.empty:
-    c1, c2 = st.columns(2)
+if country != "All":
+    country_df = df[df["Country"] == country]
 
-    with c1:
-        st.metric(
-            "Production",
-            f"{map_df['Production'].sum():,.0f}"
+    if not country_df.empty:
+        # ---- TABLE ----
+        st.markdown("### Detailed Data Table")
+        st.dataframe(
+            country_df.sort_values(["Energy", "Year"]),
+            use_container_width=True
         )
 
-    with c2:
-        st.metric(
-            "Consumption",
-            f"{map_df['Consumtion'].sum():,.0f}"
-        )
+        # ---- BAR CHARTS ----
+        col1, col2 = st.columns(2)
 
-    st.line_chart(
-        map_df.sort_values("Year").set_index("Year")[["Production", "Consumtion"]]
-    )
+        for energy, col in zip(["Oil", "Gas"], [col1, col2]):
+            with col:
+                energy_df = (
+                    country_df[country_df["Energy"] == energy]
+                    .groupby("Energy", as_index=False)[["Production", "Consumtion"]]
+                    .sum()
+                )
+
+                if not energy_df.empty:
+                    fig_bar = px.bar(
+                        energy_df.melt(
+                            id_vars="Energy",
+                            value_vars=["Production", "Consumtion"],
+                            var_name="Metric",
+                            value_name="Value"
+                        ),
+                        x="Metric",
+                        y="Value",
+                        color="Metric",
+                        title=f"{energy}: Production vs Consumption",
+                        height=360
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                else:
+                    st.info(f"No {energy} data for this country.")
+    else:
+        st.warning("No data available for selected country.")
 else:
-    st.info("Select a country to see detailed production & consumption trends.")
+    st.info("Select a country to see Oil & Gas details.")
 
 # =============================
-# TOP COUNTRIES
-# =============================
-st.subheader("Top Producing Countries")
-
-top = (
-    filtered_df
-    .groupby("Country", as_index=False)["Production"]
-    .sum()
-    .sort_values("Production", ascending=False)
-    .head(10)
-)
-
-st.dataframe(top, use_container_width=True)
-
-# =============================
-# BACK BUTTON
+# BACK
 # =============================
 if st.button("⬅ Back to Dashboard"):
     st.switch_page("app.py")
 
-st.caption("Global Energy Production – Map Detail (DuckDB-based)")
+st.caption("Global Energy Production – Map Detail")
