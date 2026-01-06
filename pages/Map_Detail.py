@@ -115,20 +115,18 @@ fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
 st.plotly_chart(fig, use_container_width=True)
 
 # =============================
-# COUNTRY DETAIL (2023 DEFAULT)
+# COUNTRY DETAIL
 # =============================
 st.subheader("Country Detail – Production vs Consumption")
 
 if country != "All":
     country_df = df[df["Country"] == country]
 
-    # pick 2023 or fallback to latest
-    if year not in country_df["Year"].values:
-        detail_row = country_df.sort_values("Year").iloc[-1]
-    else:
+    if year in country_df["Year"].values:
         detail_row = country_df[country_df["Year"] == year].iloc[0]
+    else:
+        detail_row = country_df.sort_values("Year").iloc[-1]
 
-    # ---- DETAIL TABLE ----
     detail_table = pd.DataFrame({
         "Field": [
             "Country",
@@ -148,7 +146,6 @@ if country != "All":
 
     st.dataframe(detail_table, use_container_width=True, hide_index=True)
 
-    # ---- PIE CHART ----
     pie_df = pd.DataFrame({
         "Metric": ["Production", "Consumption"],
         "Value": [
@@ -166,24 +163,43 @@ if country != "All":
     )
 
     st.plotly_chart(fig_pie, use_container_width=True)
-
 else:
     st.info("Select a country to view detailed information.")
 
 # =============================
-# TOP 10 COUNTRIES
+# TOP 10 – SIDE BY SIDE
 # =============================
-st.subheader(f"Top 10 Oil Producing Countries – {year}")
+st.subheader(f"Top 10 Oil Countries – {year}")
 
-top10 = (
-    df[df["Year"] == year]
-    .groupby(["Country", "iso3"], as_index=False)["Production"]
-    .sum()
-    .sort_values("Production", ascending=False)
-    .head(10)
-)
+col1, col2 = st.columns(2)
 
-st.dataframe(top10, use_container_width=True)
+# ---- TOP 10 PRODUCTION ----
+with col1:
+    st.markdown("### 🛢️ Top 10 Producers")
+
+    top10_prod = (
+        df[df["Year"] == year]
+        .groupby(["Country", "iso3"], as_index=False)["Production"]
+        .sum()
+        .sort_values("Production", ascending=False)
+        .head(10)
+    )
+
+    st.dataframe(top10_prod, use_container_width=True)
+
+# ---- TOP 10 CONSUMPTION ----
+with col2:
+    st.markdown("### 🔥 Top 10 Consumers")
+
+    top10_cons = (
+        df[df["Year"] == year]
+        .groupby(["Country", "iso3"], as_index=False)["Consumtion"]
+        .sum()
+        .sort_values("Consumtion", ascending=False)
+        .head(10)
+    )
+
+    st.dataframe(top10_cons, use_container_width=True)
 
 # =============================
 # BACK
